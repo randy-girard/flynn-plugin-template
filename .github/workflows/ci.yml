@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
+
+permissions:
+  contents: read
+
+env:
+  GO_VERSION: "1.24"
+
+jobs:
+  test:
+    name: Unit tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: gofmt
+        run: |
+          set -eo pipefail
+          unformatted="$(gofmt -s -l .)"
+          if [[ -n "${unformatted}" ]]; then
+            echo "gofmt -s needed on:" >&2
+            echo "${unformatted}" >&2
+            exit 1
+          fi
+
+      - name: go test
+        env:
+          CGO_ENABLED: "0"
+          GOFLAGS: "-mod=mod -buildvcs=false"
+        run: go test ./...

@@ -1,0 +1,136 @@
+name: Build and Release
+
+# Manual release only. Unit tests run via the separate CI workflow.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version tag for the release (e.g., v20260914.0)"
+        required: true
+        type: string
+      draft:
+        description: "Create as a draft (unpublished until you publish it in GitHub)"
+        required: false
+        type: boolean
+        default: true
+      runner:
+        description: "GitHub Actions runner label (use a larger runner if your org has one)"
+        required: false
+        type: string
+        default: "ubuntu-24.04"
+      flynn_version:
+        description: "Flynn GitHub release to take ubuntu-noble from (empty = latest published)"
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  contents: write
+
+env:
+  GO_VERSION: "1.24"
+
+jobs:
+  release:
+    name: Build squashfs Artifact and publish GitHub Release
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 90
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Validate version
+        id: version
+        run: |
+          set -eo pipefail
+          VERSION="${{ inputs.version }}"
+          if [[ ! "${VERSION}" =~ ^v[0-9]{8}\.[0-9]+$ ]]; then
+            echo "ERROR: version must look like vYYYYMMDD.N (got '${VERSION}')" >&2
+            exit 1
+          fi
+          git fetch --tags --force
+          if git rev-parse "${VERSION}" >/dev/null 2>&1; then
+            echo "ERROR: tag ${VERSION} already exists" >&2
+            exit 1
+          fi
+          echo "VERSION=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Building plugin image for ${VERSION}"
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Install squashfs-tools
+        run: |
+          set -eo pipefail
+          sudo apt-get update
+          sudo apt-get install -y squashfs-tools
+
+      - name: plugin-build
+        env:
+          CGO_ENABLED: "0"
+          GOFLAGS: "-mod=mod -buildvcs=false"
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FLYNN_VERSION: ${{ inputs.flynn_version }}
+        run: |
+          ./script/plugin-build \
+            -version "${{ steps.version.outputs.VERSION }}" \
+            -github-repo "${GITHUB_REPOSITORY}"
+
+      - name: Flatten layer assets for the release
+        run: |
+          set -eo pipefail
+          # GitHub Release assets are a flat list. LayerURLTemplate is
+          # .../releases/download/<tag>/{id}.squashfs so the squashfs files
+          # must sit next to image.json in the release.
+          cp dist/layers/*.squashfs dist/
+
+      - name: Determine release mode
+        id: mode
+        run: |
+          DRAFT=false
+          PRERELEASE=false
+          if [[ "${{ inputs.draft }}" == "true" ]]; then
+            DRAFT=true
+            PRERELEASE=true
+          fi
+          echo "DRAFT=${DRAFT}" >> "$GITHUB_OUTPUT"
+          echo "PRERELEASE=${PRERELEASE}" >> "$GITHUB_OUTPUT"
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -eo pipefail
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          NOTES="$(cat <<EOF
+          Flynn plugin image for ${VERSION}.
+
+          \`flynn-host plugin install\` pulls \`image.json\` from this release:
+
+          https://github.com/${GITHUB_REPOSITORY}/releases/download/${VERSION}/image.json
+
+          Layers are Flynn ubuntu-noble plus this plugin's delta (\`{id}.squashfs\` next to that Artifact).
+          EOF
+          )"
+          mapfile -t ASSETS < <(find dist -maxdepth 1 \( -name '*.json' -o -name '*.squashfs' \) | sort -u)
+          if [[ ${#ASSETS[@]} -lt 3 ]]; then
+            echo "ERROR: expected image.json, manifest json, and at least one squashfs layer" >&2
+            ls -la dist dist/layers || true
+            exit 1
+          fi
+          ARGS=(--title "${VERSION}" --notes "${NOTES}")
+          if [[ "${{ steps.mode.outputs.DRAFT }}" == "true" ]]; then
+            ARGS+=(--draft)
+          fi
+          if [[ "${{ steps.mode.outputs.PRERELEASE }}" == "true" ]]; then
+            ARGS+=(--prerelease)
+          fi
+          gh release create "${VERSION}" "${ARGS[@]}" "${ASSETS[@]}"
+          echo "Created release ${VERSION}"
+          gh release view "${VERSION}"
