@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# Run plugin unit tests.
+#
+# On Linux, runs natively. On macOS/Windows (or PLUGIN_BUILD_DOCKER=1), runs in
+# the script/docker/dev image — same split as Flynn script/run-unit-tests.
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "${ROOT}"
+# shellcheck source=script/lib/linux-container.sh
+source "${ROOT}/script/lib/linux-container.sh"
+
+run_native() {
+  export CGO_ENABLED="${CGO_ENABLED:-0}"
+  export GOFLAGS="${GOFLAGS:--mod=mod -buildvcs=false}"
+  echo "==> gofmt -s"
+  unformatted="$(gofmt -s -l .)"
+  if [[ -n "${unformatted}" ]]; then
+    echo "gofmt -s needed on:" >&2
+    echo "${unformatted}" >&2
+    exit 1
+  fi
+  echo "==> go test ./..."
+  go test ./...
+}
+
+if plugin_should_use_container; then
+  plugin_run_in_linux ./script/run-unit-tests "$@"
+else
+  run_native "$@"
+fi
