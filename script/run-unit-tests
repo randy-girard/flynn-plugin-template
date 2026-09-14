@@ -19,6 +19,8 @@ run_native() {
     echo "${unformatted}" >&2
     exit 1
   fi
+  echo "==> release notes"
+  "${ROOT}/script/test-release-notes.sh"
   echo "==> go test ./..."
   go test ./...
 }

@@ -12,7 +12,12 @@ on:
         description: "Create as a draft (unpublished until you publish it in GitHub)"
         required: false
         type: boolean
-        default: true
+        default: false
+      prerelease:
+        description: "Mark the GitHub Release as a prerelease"
+        required: false
+        type: boolean
+        default: false
       runner:
         description: "GitHub Actions runner label (use a larger runner if your org has one)"
         required: false
@@ -90,45 +95,34 @@ jobs:
           # must sit next to image.json in the release.
           cp dist/layers/*.squashfs dist/
 
-      - name: Determine release mode
-        id: mode
-        run: |
-          DRAFT=false
-          PRERELEASE=false
-          if [[ "${{ inputs.draft }}" == "true" ]]; then
-            DRAFT=true
-            PRERELEASE=true
-          fi
-          echo "DRAFT=${DRAFT}" >> "$GITHUB_OUTPUT"
-          echo "PRERELEASE=${PRERELEASE}" >> "$GITHUB_OUTPUT"
-
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -eo pipefail
           VERSION="${{ steps.version.outputs.VERSION }}"
-          NOTES="$(cat <<EOF
-          Flynn plugin image for ${VERSION}.
-
-          \`flynn-host plugin install\` pulls \`image.json\` from this release:
-
-          https://github.com/${GITHUB_REPOSITORY}/releases/download/${VERSION}/image.json
-
-          Layers are Flynn ubuntu-noble plus this plugin's delta (\`{id}.squashfs\` next to that Artifact).
-          EOF
-          )"
+          # shellcheck source=/dev/null
+          source script/lib/release-notes.sh
+          NOTES_FILE="$(mktemp)"
+          plugin_github_release_notes "${VERSION}" "${GITHUB_REPOSITORY}" > "${NOTES_FILE}"
+          echo "----- release notes (grouped) -----"
+          cat "${NOTES_FILE}"
+          echo "-----------------------------------"
+          NAME="$(plugin_manifest_name)"
+          if [[ -z "${NAME}" ]]; then
+            NAME="${GITHUB_REPOSITORY##*/}"
+          fi
           mapfile -t ASSETS < <(find dist -maxdepth 1 \( -name '*.json' -o -name '*.squashfs' \) | sort -u)
           if [[ ${#ASSETS[@]} -lt 3 ]]; then
             echo "ERROR: expected image.json, manifest json, and at least one squashfs layer" >&2
             ls -la dist dist/layers || true
             exit 1
           fi
-          ARGS=(--title "${VERSION}" --notes "${NOTES}")
-          if [[ "${{ steps.mode.outputs.DRAFT }}" == "true" ]]; then
+          ARGS=(--title "${NAME} ${VERSION}" --notes-file "${NOTES_FILE}")
+          if [[ "${{ inputs.draft }}" == "true" ]]; then
             ARGS+=(--draft)
           fi
-          if [[ "${{ steps.mode.outputs.PRERELEASE }}" == "true" ]]; then
+          if [[ "${{ inputs.prerelease }}" == "true" ]]; then
             ARGS+=(--prerelease)
           fi
           gh release create "${VERSION}" "${ARGS[@]}" "${ASSETS[@]}"

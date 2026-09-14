@@ -115,11 +115,13 @@ make plugin-build
 
 ## GitHub Actions
 
-- **CI** (`ci.yml`): `gofmt` and `go test` on push/PR (same split as Flynn unit tests).
+- **CI** (`ci.yml`): `gofmt`, release-note checks, and `go test` on push/PR (same split as Flynn unit tests).
 - **Build and Release** (`release.yml`): **manual only** (`workflow_dispatch`). Enter a version
-  like `v20260914.0`. Default is a GitHub draft/prerelease, matching Flynn. The
-  workflow builds squashfs layers, then creates the GitHub Release with
-  `image.json`, `<manifest-id>.json`, and `{id}.squashfs`.
+  like `v20260914.0`. Default is a published GitHub Release (not draft, not
+  prerelease). Notes group conventional commits the same way Flynn does, with a
+  Full Changelog compare link and install commands. The workflow builds squashfs
+  layers, then creates the GitHub Release with `image.json`, `<manifest-id>.json`,
+  and `{id}.squashfs`.
 
 `flynn-host plugin install` pulls `artifacts.image` from the release (stable
 name `image.json`). Production plugins publish those layers.
