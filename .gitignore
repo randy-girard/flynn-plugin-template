@@ -1,0 +1,5 @@
+dist/
+*.squashfs
+.DS_Store
+.plugin-build-cache/
+script/docker/dev/.image-built

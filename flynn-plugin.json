@@ -1,0 +1,44 @@
+{
+  "name": "example",
+  "kind": "app",
+  "app": {
+    "name": "example",
+    "meta": {
+      "flynn-system-app": "true",
+      "flynn-plugin": "true"
+    },
+    "processes": {
+      "web": {
+        "args": ["/bin/start-flynn-example"],
+        "ports": [{"port": 80, "proto": "tcp"}]
+      }
+    }
+  },
+  "inject_env": ["CONTROLLER_KEY", "SINGLETON"],
+  "cli": {
+    "command": "example",
+    "usage": "example Flynn plugin (template)",
+    "subcommands": ["ping"]
+  },
+  "hooks": {
+    "install": "script/install.sh"
+  },
+  "build": {
+    "base": {
+      "repo": "randy-girard/flynn",
+      "version": "latest",
+      "image": "blobstore"
+    },
+    "entrypoint": ["/bin/start-flynn-example"],
+    "packages": "img/packages.sh",
+    "go": {
+      "./cmd/example": "/bin/example"
+    },
+    "copy": {
+      "start.sh": "/bin/start-flynn-example"
+    }
+  },
+  "artifacts": {
+    "image": ""
+  }
+}
