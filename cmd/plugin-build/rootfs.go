@@ -49,6 +49,9 @@ func buildPluginLayers(repo, outDir string, plugin *pluginManifest, base *resolv
 	if err := sudoCommand("unsquashfs", "-f", "-d", lower, base.Files[0]).Run(); err != nil {
 		return "", nil, fmt.Errorf("unsquashfs ubuntu-noble: %w", err)
 	}
+	if err := requireChrootBash(lower); err != nil {
+		return "", nil, err
+	}
 
 	fmt.Fprintf(os.Stderr, "==> overlay packages + binaries\n")
 	if err := overlayChroot(repo, lower, upper, work, merged, plugin); err != nil {
@@ -77,6 +80,15 @@ func buildPluginLayers(repo, outDir string, plugin *pluginManifest, base *resolv
 		_ = sudoCommand("chown", fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid()), layerPath).Run()
 	}
 	return layerPath, layer, nil
+}
+
+func requireChrootBash(root string) error {
+	for _, rel := range []string{"bin/bash", "usr/bin/bash"} {
+		if sudoCommand("test", "-e", filepath.Join(root, rel)).Run() == nil {
+			return nil
+		}
+	}
+	return fmt.Errorf("Flynn base layer has no /bin/bash after unsquashfs (busybox or a delta, not ubuntu-noble). Set build.base.image to ubuntu-noble or postgres")
 }
 
 func overlayChroot(repo, lower, upper, work, merged string, plugin *pluginManifest) error {

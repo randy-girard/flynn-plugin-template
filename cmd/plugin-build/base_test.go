@@ -17,12 +17,12 @@ func TestPickBaseLayersPrefersUbuntuNoble(t *testing.T) {
 		"ubuntu-noble": artifact(noble, other),
 		"blobstore":    artifact(layer("blob-os", 11), layer("blob-app", 12)),
 	}
-	got, err := pickBaseLayers(images, "blobstore")
+	got, donor, err := pickBaseLayers(images, "blobstore")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(got) != 2 || got[0].ID != "noble" || got[1].ID != "other" {
-		t.Fatalf("got %#v, want ubuntu-noble's layers", ids(got))
+	if donor != "ubuntu-noble" || len(got) != 2 || got[0].ID != "noble" || got[1].ID != "other" {
+		t.Fatalf("got %#v donor=%s, want ubuntu-noble's layers", ids(got), donor)
 	}
 }
 
@@ -34,17 +34,33 @@ func TestPickBaseLayersUsesFirstLayerOfDonor(t *testing.T) {
 		"blobstore": artifact(osLayer, pkg, bin),
 		"redis":     artifact(osLayer, layer("redis-pkg", 3)),
 	}
-	got, err := pickBaseLayers(images, "blobstore")
+	got, donor, err := pickBaseLayers(images, "blobstore")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(got) != 1 || got[0].ID != "os" || got[0].Length != 319729664 {
-		t.Fatalf("got %#v, want first blobstore layer (ubuntu-noble)", ids(got))
+	if donor != "blobstore" || len(got) != 1 || got[0].ID != "os" || got[0].Length != 319729664 {
+		t.Fatalf("got %#v donor=%s, want first blobstore layer (ubuntu-noble)", ids(got), donor)
+	}
+}
+
+func TestPickBaseLayersSkipsBusyboxBlobstore(t *testing.T) {
+	busybox := layer("busybox", 1<<20)
+	noble := layer("noble-os", 199<<20)
+	images := map[string]*ct.Artifact{
+		"blobstore": artifact(busybox, layer("blob-app", 40<<20)),
+		"postgres":  artifact(noble, layer("pg-pkg", 300<<20)),
+	}
+	got, donor, err := pickBaseLayers(images, "blobstore")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if donor != "postgres" || len(got) != 1 || got[0].ID != "noble-os" {
+		t.Fatalf("got %#v donor=%s, want postgres ubuntu-noble layer", ids(got), donor)
 	}
 }
 
 func TestPickBaseLayersMissing(t *testing.T) {
-	_, err := pickBaseLayers(map[string]*ct.Artifact{"redis": artifact(layer("os", 1))}, "nope")
+	_, _, err := pickBaseLayers(map[string]*ct.Artifact{"redis": artifact(layer("os", 1))}, "nope")
 	if err == nil {
 		t.Fatal("expected error")
 	}

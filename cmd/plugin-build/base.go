@@ -16,11 +16,26 @@ import (
 
 const (
 	defaultFlynnRepo  = "randy-girard/flynn"
-	defaultBaseImage  = "blobstore"
+	defaultBaseImage  = "ubuntu-noble"
 	ubuntuNobleImage  = "ubuntu-noble"
 	githubAPIDefault  = "https://api.github.com"
 	githubDownloadFmt = "https://github.com/%s/releases/download/%s/%s.squashfs"
+	// busybox is ~2MiB; ubuntu-noble is ~200MiB. blobstore's first layer is
+	// busybox after Flynn image-slim.
+	minOSRootfsBytes = 32 << 20
 )
+
+// Flynn GitHub images.json.gz is the release template, which omits ubuntu-noble
+// as a named image. These still stack the shared ubuntu-noble squashfs first.
+var ubuntuNobleDonors = []string{
+	"postgres",
+	"gitreceive",
+	"tarreceive",
+	"dockerbuilder-24",
+	"host",
+	"taffy",
+	"slugrunner-24",
+}
 
 var (
 	githubAPIBase = githubAPIDefault
@@ -68,10 +83,14 @@ func resolveFlynnBase(repo, version, image, cacheDir string) (*resolvedBase, err
 	if err != nil {
 		return nil, err
 	}
-	layers, err := pickBaseLayers(images, image)
+	layers, donor, err := pickBaseLayers(images, image)
 	if err != nil {
 		return nil, err
 	}
+	if donor != image {
+		fmt.Fprintf(os.Stderr, "note: images.json has no usable %q rootfs; using %s layer 0 as ubuntu-noble\n", image, donor)
+	}
+	fmt.Fprintf(os.Stderr, "==> OS layer %s (%d bytes)\n", layers[0].ID, layers[0].Length)
 
 	files := make([]string, 0, len(layers))
 	for _, layer := range layers {
@@ -84,34 +103,49 @@ func resolveFlynnBase(repo, version, image, cacheDir string) (*resolvedBase, err
 	return &resolvedBase{
 		Repo:    repo,
 		Version: version,
-		Image:   image,
+		Image:   donor,
 		Layers:  layers,
 		Files:   files,
 	}, nil
 }
 
-func pickBaseLayers(images map[string]*ct.Artifact, image string) ([]*ct.ImageLayer, error) {
-	if art, ok := images[ubuntuNobleImage]; ok {
-		layers := artifactSquashfsLayers(art)
-		if len(layers) == 0 {
-			return nil, fmt.Errorf("Flynn images.json %q has no squashfs layers", ubuntuNobleImage)
-		}
-		return cloneLayers(layers), nil
+func pickBaseLayers(images map[string]*ct.Artifact, image string) ([]*ct.ImageLayer, string, error) {
+	if layers := artifactSquashfsLayers(images[ubuntuNobleImage]); len(layers) > 0 {
+		return cloneLayers(layers), ubuntuNobleImage, nil
 	}
-	art, ok := images[image]
-	if !ok {
-		names := make([]string, 0, len(images))
-		for k := range images {
-			names = append(names, k)
-		}
-		return nil, fmt.Errorf("Flynn images.json has no %q (and no %q); have %s", image, ubuntuNobleImage, strings.Join(names, ", "))
+
+	if layers := osRootfsPrefix(images[image]); len(layers) > 0 {
+		return cloneLayers(layers), image, nil
 	}
+
+	for _, name := range ubuntuNobleDonors {
+		if layers := osRootfsPrefix(images[name]); len(layers) > 0 {
+			return cloneLayers(layers), name, nil
+		}
+	}
+	for name, art := range images {
+		if layers := osRootfsPrefix(art); len(layers) > 0 {
+			return cloneLayers(layers), name, nil
+		}
+	}
+
+	names := make([]string, 0, len(images))
+	for k := range images {
+		names = append(names, k)
+	}
+	return nil, "", fmt.Errorf("no ubuntu-noble OS layer in Flynn images.json (requested %q); have %s. blobstore/controller are busybox after image-slim — pin FLYNN_VERSION or set build.base.image to postgres", image, strings.Join(names, ", "))
+}
+
+func osRootfsPrefix(art *ct.Artifact) []*ct.ImageLayer {
 	layers := artifactSquashfsLayers(art)
-	if len(layers) == 0 {
-		return nil, fmt.Errorf("Flynn image %q has no squashfs layers", image)
+	if len(layers) == 0 || !isOSRootfsLayer(layers[0]) {
+		return nil
 	}
-	// First layer of blobstore/redis/postgres/… is the shared ubuntu-noble OS.
-	return cloneLayers(layers[:1]), nil
+	return layers[:1]
+}
+
+func isOSRootfsLayer(l *ct.ImageLayer) bool {
+	return l != nil && l.Length >= minOSRootfsBytes
 }
 
 func artifactSquashfsLayers(art *ct.Artifact) []*ct.ImageLayer {

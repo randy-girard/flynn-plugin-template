@@ -83,9 +83,10 @@ paths under `dist/`.
 ## Build locally
 
 Image builds are Linux/amd64. `plugin-build` pulls Flynn's **ubuntu-noble** squashfs
-from a Flynn GitHub Release (`images.json.gz`; the first layer of `blobstore` /
-`redis` / `postgres` is that OS), overlays `img/packages.sh` + gobuild, and
-squashfs only the delta.
+from a Flynn GitHub Release (`images.json.gz`). Named `ubuntu-noble` is often
+omitted from that file; plugin-build then takes layer 0 of `postgres` /
+`gitreceive` / similar (not `blobstore`, which is busybox after image-slim).
+It overlays `img/packages.sh` + gobuild and squashfs only the delta.
 
 Default Flynn source is `randy-girard/flynn` **latest published** tag. Pin a
 release for reproducible plugin images:

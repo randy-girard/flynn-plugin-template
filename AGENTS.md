@@ -33,7 +33,7 @@ Examples:
 ```text
 feat: overlay plugin packages on Flynn ubuntu-noble
 fix: verify Flynn layers by sha512_256, not build-input id
-test: cover pickBaseLayers using blobstore's first layer
+test: skip busybox blobstore when picking ubuntu-noble
 docs: document FLYNN_VERSION pinning for plugin-build
 ci: pass GITHUB_TOKEN when resolving the Flynn release
 ```

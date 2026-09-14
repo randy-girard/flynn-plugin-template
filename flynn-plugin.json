@@ -27,7 +27,7 @@
     "base": {
       "repo": "randy-girard/flynn",
       "version": "latest",
-      "image": "blobstore"
+      "image": "ubuntu-noble"
     },
     "entrypoint": ["/bin/start-flynn-example"],
     "packages": "img/packages.sh",
