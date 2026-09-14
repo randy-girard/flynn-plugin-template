@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Build Flynn plugin squashfs layers + Artifact JSON (see cmd/plugin-build).
+#
+# On Linux, overlays Flynn's GitHub ubuntu-noble layer, then chroot + mksquashfs.
+# On macOS/Windows, uses Docker Desktop (linux/amd64, privileged) like Flynn
+# script/run-unit-tests.
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT"
+# shellcheck source=script/lib/linux-container.sh
+source "${ROOT}/script/lib/linux-container.sh"
+
+if plugin_should_use_container; then
+  plugin_run_in_linux ./script/plugin-build "$@"
+  exit $?
+fi
+
+export CGO_ENABLED="${CGO_ENABLED:-0}"
+# Flynn checkouts often export GOFLAGS=-mod=vendor; plugin repos have no vendor/.
+export GOFLAGS="-mod=mod -buildvcs=false"
+exec go run ./cmd/plugin-build "$@"
