@@ -1,19 +1,40 @@
 #!/usr/bin/env bash
 # Shared Docker Desktop wrapper (same idea as Flynn script/run-unit-tests).
-# On macOS/Windows, run Linux amd64 so plugin-build can chroot + mksquashfs and
-# go test sees Linux appliance deps. On Linux, callers run natively.
+# On macOS/Windows, run Linux for the host architecture so plugin-build can
+# chroot + mksquashfs against Flynn's ubuntu-noble layer (amd64 or arm64).
+# On Linux, callers run natively.
 #
 # Environment:
 #   PLUGIN_BUILD_DOCKER=1   Force Docker even on Linux
 #   PLUGIN_BUILD_DOCKER=0   Force native (fails on macOS without Linux deps)
-#   PLUGIN_LINUX_IMAGE      Image tag [default: flynn-plugin-dev:24.04]
-#   PLUGIN_LINUX_PLATFORM   Docker platform [default: linux/amd64]
+#   PLUGIN_LINUX_IMAGE      Image tag [default: flynn-plugin-dev:24.04-<arch>]
+#   PLUGIN_LINUX_PLATFORM   Docker platform [default: linux/<host arch>]
+#   PLUGIN_GOARCH           Override Go/OS-layer arch (amd64 or arm64)
 #
 # shellcheck disable=SC2034
 
+plugin_default_linux_platform() {
+  case "$(uname -m)" in
+    arm64|aarch64) echo linux/arm64 ;;
+    *) echo linux/amd64 ;;
+  esac
+}
+
+PLUGIN_LINUX_PLATFORM="${PLUGIN_LINUX_PLATFORM:-$(plugin_default_linux_platform)}"
+
+plugin_platform_arch() {
+  case "${PLUGIN_LINUX_PLATFORM}" in
+    *arm64*|*aarch64*) echo arm64 ;;
+    *) echo amd64 ;;
+  esac
+}
+
 PLUGIN_LINUX_IMAGE="${PLUGIN_LINUX_IMAGE:-flynn-plugin-dev:24.04}"
+case "${PLUGIN_LINUX_IMAGE}" in
+  *-amd64|*-arm64) ;;
+  *) PLUGIN_LINUX_IMAGE="${PLUGIN_LINUX_IMAGE}-$(plugin_platform_arch)" ;;
+esac
 PLUGIN_LINUX_DOCKERFILE_DIR="${PLUGIN_LINUX_DOCKERFILE_DIR:-${ROOT}/script/docker/dev}"
-PLUGIN_LINUX_PLATFORM="${PLUGIN_LINUX_PLATFORM:-linux/amd64}"
 
 plugin_host_os() {
   uname -s | tr '[:upper:]' '[:lower:]'
@@ -92,7 +113,10 @@ plugin_run_in_linux() {
     -e FLYNN_VERSION
     -e FLYNN_GITHUB_REPO
     -e FLYNN_BASE_IMAGE
+    -e FLYNN_IMAGES_JSON
+    -e FLYNN_LAYERS_DIR
     -e PLUGIN_FLYNN_VERSION
+    -e PLUGIN_GOARCH
     -e FLYNN_PLUGIN_BUILD_CACHE=/src/.plugin-build-cache
   )
 

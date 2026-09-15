@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 
 	ct "github.com/flynn/flynn/controller/types"
@@ -107,6 +108,126 @@ func TestLatestPublishedRelease(t *testing.T) {
 	}
 	if tag != "v20260911.0" {
 		t.Fatalf("tag %q", tag)
+	}
+}
+
+func TestReadImagesJSONAndLocalLayer(t *testing.T) {
+	dir := t.TempDir()
+	layerPath := dir + "/os.squashfs"
+	if err := os.WriteFile(layerPath, []byte("squashfs-bytes"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	got, err := hashLayer(layerPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	images := map[string]*ct.Artifact{
+		"ubuntu-noble": artifact(&ct.ImageLayer{
+			ID:     "os",
+			Type:   ct.ImageLayerTypeSquashfs,
+			Length: got.Length,
+			Hashes: map[string]string{"sha512_256": got.Hashes["sha512_256"]},
+		}),
+	}
+	raw, err := json.Marshal(images)
+	if err != nil {
+		t.Fatal(err)
+	}
+	jsonPath := dir + "/images.json"
+	if err := os.WriteFile(jsonPath, raw, 0644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("FLYNN_IMAGES_JSON", jsonPath)
+	t.Setenv("FLYNN_LAYERS_DIR", dir)
+	loaded, err := loadFlynnImages("unused", "local", t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	layers, donor, err := pickBaseLayers(loaded, "ubuntu-noble")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if donor != "ubuntu-noble" || len(layers) != 1 {
+		t.Fatalf("donor=%s layers=%d", donor, len(layers))
+	}
+	path, err := fetchFlynnLayer("unused", "local", layers[0], t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if path != layerPath {
+		t.Fatalf("path %s", path)
+	}
+}
+
+func TestResolveFlynnBaseUsesLocalImages(t *testing.T) {
+	dir := t.TempDir()
+	layerPath := dir + "/os.squashfs"
+	if err := os.WriteFile(layerPath, []byte("squashfs-bytes"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	got, err := hashLayer(layerPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	images := map[string]*ct.Artifact{
+		"ubuntu-noble": artifact(&ct.ImageLayer{
+			ID:     "os",
+			Type:   ct.ImageLayerTypeSquashfs,
+			Length: got.Length,
+			Hashes: map[string]string{"sha512_256": got.Hashes["sha512_256"]},
+		}),
+	}
+	raw, err := json.Marshal(images)
+	if err != nil {
+		t.Fatal(err)
+	}
+	jsonPath := dir + "/images.json"
+	if err := os.WriteFile(jsonPath, raw, 0644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("FLYNN_IMAGES_JSON", jsonPath)
+	t.Setenv("FLYNN_LAYERS_DIR", dir)
+	base, err := resolveFlynnBase("", "latest", "ubuntu-noble", t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if base.Version != "local" || base.Image != "ubuntu-noble" {
+		t.Fatalf("version=%s image=%s", base.Version, base.Image)
+	}
+	if len(base.Layers) != 1 || base.Layers[0].ID != "os" {
+		t.Fatalf("layers=%v", ids(base.Layers))
+	}
+	if len(base.Files) != 1 || base.Files[0] != layerPath {
+		t.Fatalf("files=%v", base.Files)
+	}
+}
+
+func TestFetchFlynnLayerRejectsMismatchedLocalLayer(t *testing.T) {
+	dir := t.TempDir()
+	path := dir + "/os.squashfs"
+	if err := os.WriteFile(path, []byte("wrong-bytes"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("FLYNN_LAYERS_DIR", dir)
+	_, err := fetchFlynnLayer("unused", "local", &ct.ImageLayer{
+		ID:     "os",
+		Length: 12,
+		Hashes: map[string]string{"sha512_256": "deadbeef"},
+	}, t.TempDir())
+	if err == nil || !strings.Contains(err.Error(), "local layer") {
+		t.Fatalf("got %v", err)
+	}
+}
+
+func TestFetchFlynnLayerMissingLocalLayer(t *testing.T) {
+	t.Setenv("FLYNN_LAYERS_DIR", t.TempDir())
+	_, err := fetchFlynnLayer("unused", "local", &ct.ImageLayer{
+		ID:     "missing",
+		Length: 1,
+		Hashes: map[string]string{"sha512_256": "deadbeef"},
+	}, t.TempDir())
+	if err == nil || !strings.Contains(err.Error(), "local layer") {
+		t.Fatalf("got %v", err)
 	}
 }
 

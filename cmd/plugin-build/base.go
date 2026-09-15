@@ -69,7 +69,12 @@ func resolveFlynnBase(repo, version, image, cacheDir string) (*resolvedBase, err
 	if image == "" {
 		image = defaultBaseImage
 	}
-	if version == "" || version == "latest" {
+	localImages := strings.TrimSpace(os.Getenv("FLYNN_IMAGES_JSON"))
+	if localImages != "" {
+		if version == "" || version == "latest" {
+			version = "local"
+		}
+	} else if version == "" || version == "latest" {
 		tag, err := latestPublishedRelease(repo)
 		if err != nil {
 			return nil, err
@@ -222,6 +227,10 @@ func latestPublishedRelease(repo string) (string, error) {
 }
 
 func loadFlynnImages(repo, version, cacheDir string) (map[string]*ct.Artifact, error) {
+	if p := strings.TrimSpace(os.Getenv("FLYNN_IMAGES_JSON")); p != "" {
+		fmt.Fprintf(os.Stderr, "using local images %s\n", p)
+		return readImagesJSON(p)
+	}
 	dir := filepath.Join(cacheDir, "flynn", version)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return nil, err
@@ -237,19 +246,27 @@ func loadFlynnImages(repo, version, cacheDir string) (map[string]*ct.Artifact, e
 			return nil, err
 		}
 	}
-	f, err := os.Open(gzPath)
+	return readImagesJSON(gzPath)
+}
+
+func readImagesJSON(path string) (map[string]*ct.Artifact, error) {
+	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
 	defer f.Close()
-	gz, err := gzip.NewReader(f)
-	if err != nil {
-		return nil, fmt.Errorf("images.json.gz: %w", err)
+	var r io.Reader = f
+	if strings.HasSuffix(path, ".gz") {
+		gz, err := gzip.NewReader(f)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", path, err)
+		}
+		defer gz.Close()
+		r = gz
 	}
-	defer gz.Close()
 	var images map[string]*ct.Artifact
-	if err := json.NewDecoder(gz).Decode(&images); err != nil {
-		return nil, fmt.Errorf("parse images.json: %w", err)
+	if err := json.NewDecoder(r).Decode(&images); err != nil {
+		return nil, fmt.Errorf("parse %s: %w", path, err)
 	}
 	return images, nil
 }
@@ -257,6 +274,14 @@ func loadFlynnImages(repo, version, cacheDir string) (map[string]*ct.Artifact, e
 func fetchFlynnLayer(repo, version string, layer *ct.ImageLayer, cacheDir string) (string, error) {
 	if layer == nil || layer.ID == "" {
 		return "", fmt.Errorf("Flynn base layer is missing an id")
+	}
+	if dir := strings.TrimSpace(os.Getenv("FLYNN_LAYERS_DIR")); dir != "" {
+		path := filepath.Join(dir, layer.ID+".squashfs")
+		if err := verifyLayerFile(path, layer); err != nil {
+			return "", fmt.Errorf("local layer %s: %w", path, err)
+		}
+		fmt.Fprintf(os.Stderr, "using local layer %s\n", path)
+		return path, nil
 	}
 	dir := filepath.Join(cacheDir, "flynn", version, "layers")
 	if err := os.MkdirAll(dir, 0755); err != nil {

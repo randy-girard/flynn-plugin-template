@@ -8,19 +8,20 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	ct "github.com/flynn/flynn/controller/types"
 	"github.com/flynn/flynn/pkg/squashfs"
 )
 
-func buildPluginLayers(repo, outDir string, plugin *pluginManifest, base *resolvedBase) (string, *ct.ImageLayer, error) {
+func buildPluginLayers(repo, outDir string, plugin *pluginManifest, base *resolvedBase) (string, *ct.ImageLayer, string, error) {
 	if len(base.Files) != 1 {
-		return "", nil, fmt.Errorf("plugin-build currently overlays a single ubuntu-noble layer (got %d)", len(base.Files))
+		return "", nil, "", fmt.Errorf("plugin-build currently overlays a single ubuntu-noble layer (got %d)", len(base.Files))
 	}
 
 	root, err := os.MkdirTemp("", "flynn-plugin-overlay-")
 	if err != nil {
-		return "", nil, err
+		return "", nil, "", err
 	}
 	defer func() {
 		_ = sudoCommand("umount", root).Run()
@@ -31,7 +32,7 @@ func buildPluginLayers(repo, outDir string, plugin *pluginManifest, base *resolv
 	// Keep lower/upper/work on tmpfs.
 	if err := sudoCommand("mount", "-t", "tmpfs", "-o", "size=6G", "tmpfs", root).Run(); err != nil {
 		if err := sudoCommand("mount", "-t", "tmpfs", "tmpfs", root).Run(); err != nil {
-			return "", nil, fmt.Errorf("tmpfs for overlay workspace: %w", err)
+			return "", nil, "", fmt.Errorf("tmpfs for overlay workspace: %w", err)
 		}
 	}
 
@@ -40,46 +41,54 @@ func buildPluginLayers(repo, outDir string, plugin *pluginManifest, base *resolv
 	work := filepath.Join(root, "work")
 	merged := filepath.Join(root, "merged")
 	for _, d := range []string{lower, upper, work, merged} {
-		if err := sudoCommand("mkdir", "-p", d).Run(); err != nil {
-			return "", nil, err
+		if err := os.MkdirAll(d, 0755); err != nil {
+			return "", nil, "", err
 		}
 	}
 
 	fmt.Fprintf(os.Stderr, "==> unsquashfs Flynn ubuntu-noble\n")
 	if err := sudoCommand("unsquashfs", "-f", "-d", lower, base.Files[0]).Run(); err != nil {
-		return "", nil, fmt.Errorf("unsquashfs ubuntu-noble: %w", err)
+		return "", nil, "", fmt.Errorf("unsquashfs ubuntu-noble: %w", err)
 	}
 	if err := requireChrootBash(lower); err != nil {
-		return "", nil, err
+		return "", nil, "", err
 	}
+	goarch, err := detectRootfsGoarch(lower)
+	if err != nil {
+		return "", nil, "", err
+	}
+	fmt.Fprintf(os.Stderr, "==> OS layer arch %s\n", goarch)
 
 	fmt.Fprintf(os.Stderr, "==> overlay packages + binaries\n")
 	if err := overlayChroot(repo, lower, upper, work, merged, plugin); err != nil {
-		return "", nil, err
+		return "", nil, "", err
 	}
-	if err := installBinaries(repo, upper, plugin); err != nil {
-		return "", nil, err
+	if err := installBinaries(repo, upper, plugin, goarch); err != nil {
+		return "", nil, "", err
 	}
 
 	tmpLayer := filepath.Join(outDir, "layer.squashfs.tmp")
 	_ = os.Remove(tmpLayer)
 	fmt.Fprintf(os.Stderr, "==> mksquashfs plugin delta (zstd/%s)\n", squashfs.CompressionLevel)
 	if err := mksquashfs(upper, tmpLayer); err != nil {
-		return "", nil, err
+		return "", nil, "", err
+	}
+	if err := requireSquashfsFiles(tmpLayer, imageDests(plugin)); err != nil {
+		return "", nil, "", err
 	}
 
 	layer, err := hashLayer(tmpLayer)
 	if err != nil {
-		return "", nil, err
+		return "", nil, "", err
 	}
 	layerPath := filepath.Join(outDir, "layers", layer.ID+".squashfs")
 	if err := os.Rename(tmpLayer, layerPath); err != nil {
 		if err := sudoCommand("mv", "-f", tmpLayer, layerPath).Run(); err != nil {
-			return "", nil, err
+			return "", nil, "", err
 		}
 		_ = sudoCommand("chown", fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid()), layerPath).Run()
 	}
-	return layerPath, layer, nil
+	return layerPath, layer, goarch, nil
 }
 
 func requireChrootBash(root string) error {
@@ -157,6 +166,38 @@ rm -rf "${MERGED}/var/cache/apt/archives"/* "${MERGED}/var/lib/apt/lists"/* 2>/d
 		return fmt.Errorf("overlay chroot: %w", err)
 	}
 	return nil
+}
+
+func requireSquashfsFiles(squashfsPath string, dests []string) error {
+	if len(dests) == 0 {
+		return fmt.Errorf("plugin image has no entrypoint/go/copy destinations to verify")
+	}
+	cmd := exec.Command("unsquashfs", "-l", squashfsPath)
+	out, err := cmd.Output()
+	if err != nil {
+		return fmt.Errorf("unsquashfs -l %s: %w", squashfsPath, err)
+	}
+	listing := string(out)
+	for _, dest := range dests {
+		if !squashfsHasFile(listing, dest) {
+			return fmt.Errorf("plugin delta squashfs missing %s (usr-merged /bin must be stored as usr/bin so /bin/bash stays visible)", dest)
+		}
+	}
+	return nil
+}
+
+func squashfsHasFile(listing, dest string) bool {
+	rel := strings.TrimPrefix(filepath.ToSlash(filepath.Clean(dest)), "/")
+	needles := []string{"squashfs-root/" + rel}
+	if rel == "bin" || strings.HasPrefix(rel, "bin/") {
+		needles = append(needles, "squashfs-root/usr/"+rel)
+	}
+	for _, needle := range needles {
+		if strings.Contains(listing, needle) {
+			return true
+		}
+	}
+	return false
 }
 
 func mksquashfs(src, dst string) error {

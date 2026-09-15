@@ -118,8 +118,11 @@ func run() error {
 		return nil
 	}
 
-	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
-		return fmt.Errorf("image builds require linux/amd64 (Flynn squashfs layers); this host is %s/%s", runtime.GOOS, runtime.GOARCH)
+	if runtime.GOOS != "linux" {
+		return fmt.Errorf("image builds require Linux (Flynn squashfs layers); this host is %s/%s", runtime.GOOS, runtime.GOARCH)
+	}
+	if !supportedGoarch(runtime.GOARCH) {
+		return fmt.Errorf("image builds require linux/amd64 or linux/arm64; this host is %s/%s", runtime.GOOS, runtime.GOARCH)
 	}
 	if _, err := exec.LookPath("mksquashfs"); err != nil {
 		return fmt.Errorf("mksquashfs is required (apt install squashfs-tools): %w", err)
@@ -147,12 +150,14 @@ func run() error {
 		}
 	}
 
-	layerFile, pluginLayer, err := buildPluginLayers(dirAbs, outDir, plugin, base)
+	layerFile, pluginLayer, goarch, err := buildPluginLayers(dirAbs, outDir, plugin, base)
 	if err != nil {
 		return err
 	}
 
 	layers := append(append([]*ct.ImageLayer{}, base.Layers...), pluginLayer)
+	filesMeta := strings.Join(imageDests(plugin), ",")
+	platform := &ct.ImagePlatform{OS: "linux", Architecture: goarch}
 
 	manifest := &ct.ImageManifest{
 		Type: ct.ImageManifestTypeV1,
@@ -161,12 +166,14 @@ func run() error {
 			"flynn.plugin":            "true",
 			"flynn.plugin.base":       base.Repo + "@" + base.Version,
 			"flynn.plugin.base.image": base.Image,
+			"flynn.plugin.files":      filesMeta,
+			"flynn.plugin.arch":       goarch,
 		},
 		Entrypoints: map[string]*ct.ImageEntrypoint{
 			"_default": {Args: plugin.Build.Entrypoint},
 		},
 		Rootfs: []*ct.ImageRootfs{{
-			Platform: ct.DefaultImagePlatform,
+			Platform: platform,
 			Layers:   layers,
 		}},
 	}
@@ -189,6 +196,8 @@ func run() error {
 			"flynn.plugin.version":    *version,
 			"flynn.plugin.base":       base.Repo + "@" + base.Version,
 			"flynn.plugin.base.image": base.Image,
+			"flynn.plugin.files":      filesMeta,
+			"flynn.plugin.arch":       goarch,
 		},
 	}
 
@@ -205,6 +214,7 @@ func run() error {
 
 	fmt.Printf("plugin:     %s\n", plugin.Name)
 	fmt.Printf("version:    %s\n", *version)
+	fmt.Printf("arch:       linux/%s\n", goarch)
 	fmt.Printf("flynn_base: %s@%s (%s)\n", base.Repo, base.Version, base.Image)
 	fmt.Printf("image:      %s\n", imageJSONPath)
 	fmt.Printf("manifest:   %s\n", manifestID)
