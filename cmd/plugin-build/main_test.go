@@ -168,3 +168,21 @@ func TestEnvOrAndFirstNonEmpty(t *testing.T) {
 		t.Fatal("firstNonEmpty")
 	}
 }
+
+func TestWriteCompactJSONDoesNotEscapeHTML(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "image.json")
+	if err := writeCompactJSON(path, map[string]string{"sha": "abc<def>"}); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(data)
+	if !strings.Contains(got, "abc<def>") {
+		t.Fatalf("layer hashes must not be HTML-escaped: %s", got)
+	}
+	if strings.Contains(got, `\u003c`) {
+		t.Fatalf("unexpected unicode escape: %s", got)
+	}
+}
