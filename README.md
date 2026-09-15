@@ -138,7 +138,10 @@ Common fields:
 - `kind` — `app` or `resource-provider`
 - `app` — system app spec (`flynn-system-app`, `flynn-plugin` meta)
 - `inject_env` — cluster secrets the installer copies in (`CONTROLLER_KEY`, …)
-- `cli` — optional catalog entry the user `flynn` CLI downloads from the cluster
+- `cli` — optional user `flynn` command. After install the laptop fetches this
+  from the cluster (`command`, `usage`, `doc`, `actions`). The CLI does not
+  compile plugin handlers; runnable plugins set `doc` (docopt) and `actions`
+  (cluster jobs using the plugin/resource image). See Flynn `docs/content/plugins.md`.
 - `hooks.install` — optional script run against the cluster before deploy
 - `build.entrypoint` — Flynn ImageManifest args
 - `build.base` — Flynn GitHub repo/tag/`images.json` key for ubuntu-noble (`version: latest` or a pin like `v20260911.0`)
@@ -164,5 +167,5 @@ flynn-host plugin install https://github.com/OWNER/flynn-plugin-example.git --re
 ```
 
 The user `flynn` CLI never installs plugins. After install it shows commands
-listed in that cluster's CLI catalog (`cli` is optional; an `app` plugin may
-have none).
+listed in that cluster's CLI catalog when `cli.doc` and `cli.actions` are set
+(`cli` is optional; an `app` plugin may have none).
