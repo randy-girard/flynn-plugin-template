@@ -28,7 +28,7 @@ func TestOverlayDestMapsBinToUsrBin(t *testing.T) {
 }
 
 func TestOverlayDestRejectsUnsafePaths(t *testing.T) {
-	for _, dest := range []string{"/", ".", "..", "../etc/passwd", "/.."} {
+	for _, dest := range []string{"/", ".", "..", "../etc/passwd", "/..", "foo/../../etc/passwd", "/usr/../../.."} {
 		if _, err := overlayDest("/tmp/upper", dest); err == nil {
 			t.Fatalf("expected error for %q", dest)
 		}

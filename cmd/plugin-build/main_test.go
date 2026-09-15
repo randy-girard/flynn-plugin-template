@@ -59,6 +59,10 @@ func TestValidatePluginKindsAndRepoFiles(t *testing.T) {
 	if err := validatePlugin(root, ok); err == nil || !strings.Contains(err.Error(), "directory") {
 		t.Fatalf("directory copy: %v", err)
 	}
+	ok.Build.Copy = map[string]string{"foo/../secret": "/secret"}
+	if err := validatePlugin(root, ok); err == nil || !strings.Contains(err.Error(), "inside the plugin repo") {
+		t.Fatalf("dot-dot copy: %v", err)
+	}
 }
 
 func TestApplyBuildDefaults(t *testing.T) {
