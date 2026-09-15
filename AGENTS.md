@@ -9,7 +9,7 @@ Do not land behavior without tests in the **same change**.
 - New or changed Go logic: `*_test.go` next to the code (`go test ./...`).
 - `cmd/plugin-build` (manifest, Flynn base selection, layer verify): unit tests in `cmd/plugin-build/*_test.go`.
 - Install hooks and scripts: if they grow real logic, add a test or a grep-guard so the path cannot silently disappear.
-- Run `./script/run-unit-tests` (native on Linux; Docker on macOS). `gofmt -s` must be clean.
+- Run `./script/run-unit-tests` (native on Linux; Docker on macOS). `gofmt -s` must be clean. Unit tests write HTML coverage under `coverage/` (gitignored).
 
 Skip tests only when the change cannot regress (typo in comments, LICENSE). Say so in the commit body.
 

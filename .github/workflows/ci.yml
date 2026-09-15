@@ -50,4 +50,7 @@ jobs:
         env:
           CGO_ENABLED: "0"
           GOFLAGS: "-mod=mod -buildvcs=false"
-        run: go test ./...
+        run: |
+          mkdir -p coverage
+          go test -covermode=atomic -coverprofile=coverage/pkg.out ./...
+          ./script/report-unit-coverage coverage/pkg.out

@@ -110,6 +110,8 @@ make test-unit
 make plugin-build
 ```
 
+Unit tests write HTML coverage under `coverage/` (gitignored): open `coverage/index.html`. Set `PLUGIN_SKIP_COVERAGE=1` to skip the report.
+
 `PLUGIN_BUILD_DOCKER=0` forces native (fails on macOS without Linux deps).
 `PLUGIN_BUILD_DOCKER=1` forces Docker even on Linux.
 
