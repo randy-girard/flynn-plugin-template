@@ -1,6 +1,6 @@
 # Flynn plugin template
 
-[![coverage](https://raw.githubusercontent.com/randy-girard/flynn-plugin-template/coverage-badge/badge.svg)](https://github.com/randy-girard/flynn-plugin-template/actions/workflows/ci.yml)
+[![coverage](.github/badges/coverage.svg)](https://github.com/randy-girard/flynn-plugin-template/actions/workflows/ci.yml)
 
 Skeleton repository for a Flynn plugin. Copy this layout for a new first-party
 cluster app: a resource provider (Redis, MariaDB, MongoDB, Kafka, ClickHouse)
