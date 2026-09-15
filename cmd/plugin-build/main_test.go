@@ -121,6 +121,16 @@ func TestWritePluginManifestAndLoad(t *testing.T) {
 	if err != nil || got.Name != "widget" || got.Kind != "app" || len(data) == 0 {
 		t.Fatalf("%+v %v", got, err)
 	}
+	bad := filepath.Join(root, "bad.json")
+	if err := os.WriteFile(bad, []byte("{"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := loadPlugin(bad); err == nil {
+		t.Fatal("invalid plugin JSON must fail")
+	}
+	if err := writePluginManifest(filepath.Join(root, "out.json"), []byte("{"), "https://example/image.json", nil); err == nil {
+		t.Fatal("invalid manifest JSON must not be rewritten")
+	}
 
 	out := filepath.Join(root, "dist", "flynn-plugin.json")
 	if err := os.MkdirAll(filepath.Dir(out), 0755); err != nil {
