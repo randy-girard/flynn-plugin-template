@@ -32,6 +32,7 @@ cmd/<name>/           Plugin process
 cmd/plugin-build/     Writes dist/image.json + squashfs layers Flynn pulls
 script/plugin-build   Wrapper: CGO_ENABLED=0 go run ./cmd/plugin-build
 script/install.sh     Optional hook: cluster setup before the app is deployed
+script/uninstall.sh   Optional hook: cluster cleanup before the app is deleted
 .github/workflows/    CI (unit tests) and manual Build and Release
 ```
 
@@ -56,6 +57,10 @@ directory is the plugin checkout. A non-zero exit aborts install.
 Hooks are optional. Redis does not need one; a dashboard often does. Scripts
 must be idempotent: `plugin update` runs `hooks.upgrade` if set, otherwise
 `hooks.install` again.
+
+`flynn-host plugin uninstall` runs `hooks.uninstall` (if set) before deleting
+the plugin app. A non-zero exit aborts uninstall. Resource-provider plugins
+with leftover provisioned resources refuse unless `--force`.
 
 ## What Flynn pulls
 
@@ -147,6 +152,7 @@ Common fields:
   compile plugin handlers; runnable plugins set `doc` (docopt) and `actions`
   (cluster jobs using the plugin/resource image). See Flynn `docs/content/plugins.md`.
 - `hooks.install` — optional script run against the cluster before deploy
+- `hooks.uninstall` — optional script run against the cluster before app delete
 - `build.entrypoint` — Flynn ImageManifest args
 - `build.base` — Flynn GitHub repo/tag/`images.json` key for ubuntu-noble (`version: latest` or a pin like `v20260911.0`)
 - `build.packages` — chroot apt overlay on that base
@@ -168,6 +174,7 @@ Do not vendor `pkg/sirenia`, discoverd, or the controller client; `require`
 flynn-host plugin install example
 flynn-host plugin install /path/to/this-repo
 flynn-host plugin install https://github.com/OWNER/flynn-plugin-example.git --ref v20260914.0
+flynn-host plugin uninstall example
 ```
 
 The user `flynn` CLI never installs plugins. After install it shows commands

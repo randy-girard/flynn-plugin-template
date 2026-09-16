@@ -21,7 +21,8 @@
     "subcommands": ["ping"]
   },
   "hooks": {
-    "install": "script/install.sh"
+    "install": "script/install.sh",
+    "uninstall": "script/uninstall.sh"
   },
   "build": {
     "base": {

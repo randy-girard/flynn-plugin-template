@@ -207,7 +207,10 @@ func TestCopyHookAssets(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, "script", "install.sh"), body, 0755); err != nil {
 		t.Fatal(err)
 	}
-	if err := copyHookAssets(root, out, pluginHooks{Install: "script/install.sh"}); err != nil {
+	if err := os.WriteFile(filepath.Join(root, "script", "uninstall.sh"), body, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := copyHookAssets(root, out, pluginHooks{Install: "script/install.sh", Uninstall: "script/uninstall.sh"}); err != nil {
 		t.Fatal(err)
 	}
 	dest := filepath.Join(out, "script-install.sh")
@@ -218,8 +221,19 @@ func TestCopyHookAssets(t *testing.T) {
 	if string(got) != string(body) {
 		t.Fatalf("copied=%q", got)
 	}
+	uninst := filepath.Join(out, "script-uninstall.sh")
+	got, err = os.ReadFile(uninst)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != string(body) {
+		t.Fatalf("uninstall copied=%q", got)
+	}
 	if hookAssetName("script/install.sh") != "script-install.sh" {
 		t.Fatal(hookAssetName("script/install.sh"))
+	}
+	if hookAssetName("script/uninstall.sh") != "script-uninstall.sh" {
+		t.Fatal(hookAssetName("script/uninstall.sh"))
 	}
 	if err := copyHookAssets(root, out, pluginHooks{Install: "../secret"}); err == nil {
 		t.Fatal("path escape")
@@ -233,5 +247,37 @@ func TestReleaseWorkflowUploadsHookScripts(t *testing.T) {
 	}
 	if !strings.Contains(string(raw), "*.sh") {
 		t.Fatal("Build and Release must upload dist/*.sh hook assets")
+	}
+}
+
+func TestRepoFlynnPluginManifestUninstallHook(t *testing.T) {
+	root, err := filepath.Abs("../..")
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(filepath.Join(root, "flynn-plugin.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var m struct {
+		Hooks struct {
+			Install   string `json:"install"`
+			Uninstall string `json:"uninstall"`
+		} `json:"hooks"`
+	}
+	if err := json.Unmarshal(raw, &m); err != nil {
+		t.Fatal(err)
+	}
+	if m.Hooks.Install != "script/install.sh" {
+		t.Fatalf("hooks.install=%q", m.Hooks.Install)
+	}
+	if m.Hooks.Uninstall != "script/uninstall.sh" {
+		t.Fatalf("hooks.uninstall=%q", m.Hooks.Uninstall)
+	}
+	if _, err := os.Stat(filepath.Join(root, "script", "uninstall.sh")); err != nil {
+		t.Fatal(err)
+	}
+	if hookAssetName(m.Hooks.Uninstall) != "script-uninstall.sh" {
+		t.Fatalf("asset name=%q", hookAssetName(m.Hooks.Uninstall))
 	}
 }

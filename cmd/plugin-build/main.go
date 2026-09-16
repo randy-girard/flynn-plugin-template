@@ -12,6 +12,7 @@
 //	layers/<layer-id>.squashfs  Flynn ubuntu-noble plus the plugin delta
 //	flynn-plugin.json       copy of the plugin manifest with artifacts.image filled in
 //	script-install.sh       declared hooks (script/install.sh flattened for GitHub)
+//	script-uninstall.sh     declared hooks (script/uninstall.sh flattened for GitHub)
 package main
 
 import (
