@@ -11,6 +11,7 @@
 //	<manifest-id>.json      ImageManifest bytes that Artifact.URI points at
 //	layers/<layer-id>.squashfs  Flynn ubuntu-noble plus the plugin delta
 //	flynn-plugin.json       copy of the plugin manifest with artifacts.image filled in
+//	script-install.sh       declared hooks (script/install.sh flattened for GitHub)
 package main
 
 import (
@@ -211,6 +212,9 @@ func run() error {
 	if err := writePluginManifest(filepath.Join(outDir, "flynn-plugin.json"), rawPlugin, artifactURL, base); err != nil {
 		return err
 	}
+	if err := copyHookAssets(dirAbs, outDir, plugin.Hooks); err != nil {
+		return err
+	}
 
 	fmt.Printf("plugin:     %s\n", plugin.Name)
 	fmt.Printf("version:    %s\n", *version)
@@ -269,6 +273,39 @@ func validatePlugin(root string, plugin *pluginManifest) error {
 		}
 	}
 	return nil
+}
+
+func copyHookAssets(root, outDir string, hooks pluginHooks) error {
+	for _, rel := range []string{hooks.Install, hooks.Upgrade, hooks.Uninstall} {
+		rel = strings.TrimSpace(rel)
+		if rel == "" {
+			continue
+		}
+		name := hookAssetName(rel)
+		if name == "" || name == "." {
+			return fmt.Errorf("hooks path %q is invalid", rel)
+		}
+		src := filepath.Join(root, filepath.FromSlash(rel))
+		dst := filepath.Join(outDir, name)
+		if err := copyFile(src, dst); err != nil {
+			return fmt.Errorf("hooks %s: %w", rel, err)
+		}
+		if err := os.Chmod(dst, 0755); err != nil {
+			return fmt.Errorf("hooks %s: %w", rel, err)
+		}
+	}
+	return nil
+}
+
+// hookAssetName matches Flynn pkg/plugin.HookAssetNames: GitHub assets are a
+// flat list, so script/install.sh is published as script-install.sh.
+func hookAssetName(rel string) string {
+	rel = filepath.ToSlash(filepath.Clean(strings.TrimSpace(rel)))
+	rel = strings.TrimPrefix(rel, "./")
+	if rel == "" || rel == "." || filepath.IsAbs(rel) || strings.HasPrefix(rel, "../") {
+		return ""
+	}
+	return strings.ReplaceAll(rel, "/", "-")
 }
 
 func repoFile(root, field, rel string) error {

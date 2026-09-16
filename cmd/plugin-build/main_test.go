@@ -196,3 +196,42 @@ func TestWriteCompactJSONDoesNotEscapeHTML(t *testing.T) {
 		t.Fatalf("unexpected unicode escape: %s", got)
 	}
 }
+
+func TestCopyHookAssets(t *testing.T) {
+	root := t.TempDir()
+	out := filepath.Join(root, "dist")
+	if err := os.MkdirAll(filepath.Join(root, "script"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	body := []byte("#!/bin/sh\nexit 0\n")
+	if err := os.WriteFile(filepath.Join(root, "script", "install.sh"), body, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := copyHookAssets(root, out, pluginHooks{Install: "script/install.sh"}); err != nil {
+		t.Fatal(err)
+	}
+	dest := filepath.Join(out, "script-install.sh")
+	got, err := os.ReadFile(dest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != string(body) {
+		t.Fatalf("copied=%q", got)
+	}
+	if hookAssetName("script/install.sh") != "script-install.sh" {
+		t.Fatal(hookAssetName("script/install.sh"))
+	}
+	if err := copyHookAssets(root, out, pluginHooks{Install: "../secret"}); err == nil {
+		t.Fatal("path escape")
+	}
+}
+
+func TestReleaseWorkflowUploadsHookScripts(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", ".github", "workflows", "release.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(raw), "*.sh") {
+		t.Fatal("Build and Release must upload dist/*.sh hook assets")
+	}
+}

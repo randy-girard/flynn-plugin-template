@@ -112,7 +112,7 @@ jobs:
           if [[ -z "${NAME}" ]]; then
             NAME="${GITHUB_REPOSITORY##*/}"
           fi
-          mapfile -t ASSETS < <(find dist -maxdepth 1 \( -name '*.json' -o -name '*.squashfs' \) | sort -u)
+          mapfile -t ASSETS < <(find dist -maxdepth 1 \( -name '*.json' -o -name '*.squashfs' -o -name '*.sh' \) | sort -u)
           if [[ ${#ASSETS[@]} -lt 3 ]]; then
             echo "ERROR: expected image.json, manifest json, and at least one squashfs layer" >&2
             ls -la dist dist/layers || true
