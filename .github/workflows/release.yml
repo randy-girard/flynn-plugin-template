@@ -63,8 +63,7 @@ jobs:
             exit 1
           fi
           if git rev-parse "${VERSION}" >/dev/null 2>&1; then
-            echo "ERROR: tag ${VERSION} already exists" >&2
-            exit 1
+            echo "Git tag ${VERSION} already exists; GitHub release publish will resume an incomplete upload"
           fi
           echo "VERSION=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "Building plugin image for ${VERSION}"
@@ -96,10 +95,13 @@ jobs:
       - name: Flatten layer assets for the release
         run: |
           set -eo pipefail
-          # GitHub Release assets are a flat list. LayerURLTemplate is
-          # .../releases/download/<tag>/{id}.squashfs so the squashfs files
-          # must sit next to image.json in the release.
-          cp dist/layers/*.squashfs dist/
+          # GitHub Release assets are a flat list. Publish only the plugin
+          # overlay delta. Flynn ubuntu-noble is already on the Flynn GitHub
+          # Release (same layer id); re-uploading it from every plugin 502s
+          # uploads.github.com.
+          # shellcheck source=script/lib/flatten-plugin-release.sh
+          source ./script/lib/flatten-plugin-release.sh
+          flatten_plugin_release_assets dist
 
       - name: Publish GitHub Release
         env:
@@ -118,19 +120,18 @@ jobs:
           if [[ -z "${NAME}" ]]; then
             NAME="${GITHUB_REPOSITORY##*/}"
           fi
-          mapfile -t ASSETS < <(find dist -maxdepth 1 \( -name '*.json' -o -name '*.squashfs' -o -name '*.sh' \) | sort -u)
-          if [[ ${#ASSETS[@]} -lt 3 ]]; then
-            echo "ERROR: expected image.json, manifest json, and at least one squashfs layer" >&2
+          if ! compgen -G "dist/*.squashfs" >/dev/null; then
+            echo "ERROR: expected plugin delta squashfs in dist/" >&2
             ls -la dist dist/layers || true
             exit 1
           fi
-          ARGS=(--title "${NAME} ${VERSION}" --notes-file "${NOTES_FILE}")
-          if [[ "${{ inputs.draft }}" == "true" ]]; then
-            ARGS+=(--draft)
-          fi
-          if [[ "${{ inputs.prerelease }}" == "true" ]]; then
-            ARGS+=(--prerelease)
-          fi
-          gh release create "${VERSION}" "${ARGS[@]}" "${ASSETS[@]}"
-          echo "Created release ${VERSION}"
-          gh release view "${VERSION}"
+          # shellcheck source=script/lib/github-release-upload.sh
+          source ./script/lib/github-release-upload.sh
+          github_release_publish \
+            --version "${VERSION}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --title "${NAME} ${VERSION}" \
+            --notes-file "${NOTES_FILE}" \
+            --dir dist \
+            --draft "${{ inputs.draft }}" \
+            --prerelease "${{ inputs.prerelease }}"

@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -245,8 +246,75 @@ func TestReleaseWorkflowUploadsHookScripts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(raw), "*.sh") {
-		t.Fatal("Build and Release must upload dist/*.sh hook assets")
+	body := string(raw)
+	if !strings.Contains(body, "github_release_publish") {
+		t.Fatal("Build and Release must upload assets one file at a time")
+	}
+	if !strings.Contains(body, "flatten-plugin-release.sh") {
+		t.Fatal("Build and Release must flatten only the plugin delta")
+	}
+	if strings.Contains(body, "cp dist/layers/*.squashfs dist/") {
+		t.Fatal("must not re-upload Flynn ubuntu-noble from dist/layers")
+	}
+}
+
+func TestFlattenPluginReleaseCopiesOnlyDelta(t *testing.T) {
+	root, err := filepath.Abs("../..")
+	if err != nil {
+		t.Fatal(err)
+	}
+	script := filepath.Join(root, "script", "lib", "flatten-plugin-release.sh")
+	dist := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dist, "layers"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	osID := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	deltaID := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	image := map[string]interface{}{
+		"manifest": map[string]interface{}{
+			"rootfs": []interface{}{
+				map[string]interface{}{
+					"layers": []interface{}{
+						map[string]interface{}{"id": osID},
+						map[string]interface{}{"id": deltaID},
+					},
+				},
+			},
+		},
+	}
+	raw, err := json.Marshal(image)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dist, "image.json"), raw, 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dist, "layers", osID+".squashfs"), []byte("os"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dist, "layers", deltaID+".squashfs"), []byte("delta"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dist, osID+".squashfs"), []byte("leftover-os"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command("bash", script, dist)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("flatten: %v\n%s", err, out)
+	}
+	if _, err := os.Stat(filepath.Join(dist, osID+".squashfs")); !os.IsNotExist(err) {
+		t.Fatal("Flynn ubuntu-noble must not be copied to the release dir")
+	}
+	got, err := os.ReadFile(filepath.Join(dist, deltaID+".squashfs"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != "delta" {
+		t.Fatalf("delta %q", got)
+	}
+	if _, err := os.Stat(filepath.Join(dist, "layers", osID+".squashfs")); err != nil {
+		t.Fatal("local DistReady still needs ubuntu-noble under dist/layers")
 	}
 }
 

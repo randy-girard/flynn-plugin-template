@@ -70,18 +70,20 @@ with leftover provisioned resources refuse unless `--force`.
 |------|------|
 | `dist/image.json` | Controller Artifact: `manifest`, `hashes` (`sha512_256`), `layer_url_template` |
 | `dist/<manifest-id>.json` | ImageManifest bytes that `artifact.uri` points at |
-| `dist/layers/<layer-id>.squashfs` | Flynn ubuntu-noble (same id as Flynn) plus the plugin delta |
+| `dist/layers/<layer-id>.squashfs` | Flynn ubuntu-noble (local overlay only) plus the plugin delta |
 | `dist/flynn-plugin.json` | Manifest with `artifacts.image` set to the Artifact URL |
 
-Layer URLs are **HTTPS GitHub Release assets**, not `file://` host-cache paths
-(those are only for images shipped inside the Flynn tarball):
+The GitHub Release publishes the **plugin delta** squashfs next to `image.json`.
+Flynn ubuntu-noble stays on the Flynn GitHub Release (same layer id); hosts
+fetch it from artifact meta `flynn.plugin.base`. Re-uploading that OS layer from
+every plugin (~200MiB × N jobs) 502s `uploads.github.com`.
 
 ```text
-https://github.com/<owner>/<repo>/releases/download/<tag>/{id}.squashfs
+https://github.com/<owner>/<plugin-repo>/releases/download/<tag>/{delta-id}.squashfs
+https://github.com/<owner>/flynn/releases/download/<flynn-tag>/{ubuntu-noble-id}.squashfs
 ```
 
-`{id}` is the layer ID (sha512_256 of the squashfs file). Hosts expand
-`layer_url_template` the same way they do for other Flynn images.
+`{id}` is the layer ID (sha512_256 of the squashfs file).
 
 When `-github-repo` / `GITHUB_REPOSITORY` and a release `-version` (git tag) are
 set, those HTTPS URLs are written into `image.json`. Local builds use `file://`
@@ -130,7 +132,7 @@ Unit tests write HTML coverage under `coverage/` (gitignored): open `coverage/in
   prerelease). Notes group conventional commits the same way Flynn does, with a
   Full Changelog compare link and install commands. The workflow builds squashfs
   layers, then creates the GitHub Release with `image.json`, `<manifest-id>.json`,
-  and `{id}.squashfs`.
+  hook scripts, and the plugin **delta** squashfs (not Flynn ubuntu-noble).
 
 `flynn-host plugin install` pulls `artifacts.image` from the release (stable
 name `image.json`). Production plugins publish those layers.
