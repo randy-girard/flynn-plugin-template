@@ -95,4 +95,6 @@ if grep -qi 'ci: update coverage badge' "${sample}"; then
   exit 1
 fi
 
+"${ROOT}/script/test-calver.sh"
+
 echo "ok GitHub release notes are grouped like Flynn"
