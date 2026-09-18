@@ -97,4 +97,17 @@ fi
 
 "${ROOT}/script/test-calver.sh"
 
+if ! grep -q 'sort -V' "${notes_lib}"; then
+  echo "release-notes lib must pick the previous tag by version, not git describe HEAD^" >&2
+  exit 1
+fi
+if grep -q 'describe --tags --abbrev=0 --match' "${notes_lib}"; then
+  echo "release-notes lib must not use git describe for the previous tag (wrong tag on topic branches)" >&2
+  exit 1
+fi
+if ! grep -q 'plugin_commit_range_since_previous' "${notes_lib}"; then
+  echo "release-notes lib must range previous tag..this tag" >&2
+  exit 1
+fi
+
 echo "ok GitHub release notes are grouped like Flynn"
