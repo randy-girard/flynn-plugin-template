@@ -4,7 +4,7 @@ go 1.24.0
 
 toolchain go1.24.12
 
-require github.com/randy-girard/flynn v0.0.0-20260918132949-7903267f036b
+require github.com/randy-girard/flynn v0.0.0-20260918165205-684ac031d829
 
 require (
 	github.com/docker/go-units v0.3.0 // indirect
