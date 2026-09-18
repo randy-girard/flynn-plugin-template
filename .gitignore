@@ -4,3 +4,8 @@ dist/
 .plugin-build-cache/
 script/docker/dev/.image-built
 /coverage/
+# Local overlay of an unpublished Flynn checkout:
+#   go work init .
+#   go work edit -replace github.com/randy-girard/flynn=../flynn
+go.work
+go.work.sum

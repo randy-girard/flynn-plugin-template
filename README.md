@@ -161,14 +161,8 @@ Common fields:
 - `build.go` / `build.copy` — binaries and scripts installed into the delta layer
 - `artifacts.image` — filled by `plugin-build` / the release workflow
 
-Pin Flynn with a Go module `replace` to the Flynn revision you build against:
-
-```go
-replace github.com/flynn/flynn => github.com/randy-girard/flynn <commit>
-```
-
-Do not vendor `pkg/sirenia`, discoverd, or the controller client; `require`
-`github.com/flynn/flynn` instead.
+Flynn APIs are declared in `go.mod` as `require github.com/randy-girard/flynn`.
+Builds use `-mod=mod` (no `vendor/` directory). Do not pin a sibling `../flynn` replace.
 
 ## Install
 

@@ -44,5 +44,6 @@ Commit when asked. Push only when asked.
 
 - Do not rebuild Ubuntu from a cloud image; `plugin-build` must pull Flynn’s ubuntu-noble layer.
 - Pin Flynn with `build.base.version` / `-flynn-version` for published releases; `latest` is for local builds.
+- Import Flynn APIs as `github.com/randy-girard/flynn/...`. `go.mod` must `require github.com/randy-girard/flynn`. Do not vendor Flynn and do not `replace` it with a sibling `../flynn`.
 - Do not put datastore packages in a shared Flynn base. This template’s image is the example app only.
 - `flynn-host plugin install` is operator-only; the user `flynn` CLI does not install plugins.
