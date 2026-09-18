@@ -16,6 +16,6 @@ if plugin_should_use_container; then
 fi
 
 export CGO_ENABLED="${CGO_ENABLED:-0}"
-# Flynn checkouts often export GOFLAGS=-mod=vendor; plugin repos have no vendor/.
+# Resolve Flynn from go.mod (github.com/randy-girard/flynn).
 export GOFLAGS="-mod=mod -buildvcs=false"
 exec go run ./cmd/plugin-build "$@"

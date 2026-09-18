@@ -438,4 +438,13 @@ func TestFlynnGoModUsesRandyGirardRepo(t *testing.T) {
 			t.Fatalf("%s must set GOPRIVATE=github.com/randy-girard/*", rel)
 		}
 	}
+	if strings.Contains(body, "\nreplace ") || strings.HasPrefix(strings.TrimSpace(body), "replace ") {
+		t.Fatal("go.mod must not contain replace directives; each plugin repo builds independently")
+	}
+	if strings.Contains(body, "=> ../") {
+		t.Fatal("go.mod must not replace modules with sibling checkouts")
+	}
+	if _, err := os.Stat(filepath.Join(root, "go.work")); err == nil {
+		t.Fatal("plugins must not use go.work; each repo builds independently of Flynn and other plugins")
+	}
 }

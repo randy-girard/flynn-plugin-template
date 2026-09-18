@@ -10,8 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	ct "github.com/flynn/flynn/controller/types"
-	"github.com/flynn/flynn/pkg/squashfs"
+	ct "github.com/randy-girard/flynn/controller/types"
+	"github.com/randy-girard/flynn/pkg/squashfs"
 )
 
 func buildPluginLayers(repo, outDir string, plugin *pluginManifest, base *resolvedBase) (string, *ct.ImageLayer, string, error) {
