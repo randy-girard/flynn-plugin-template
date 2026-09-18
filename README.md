@@ -7,7 +7,7 @@ cluster app: a resource provider (Redis, MariaDB, MongoDB, Kafka, ClickHouse)
 or something that is not a database, such as a dashboard.
 
 A plugin is a **git repo** with `flynn-plugin.json` at the root — not a user
-`git push` app. `flynn-host plugin install` (cluster operator, not the user
+`git push` app. `flynn-host plugin:install` (cluster operator, not the user
 `flynn` CLI) reads that manifest, pulls a **prebuilt Flynn Artifact** from GitHub
 Releases, runs an optional **install hook** against the cluster, and deploys a
 system app. Resource-provider plugins also register a provider; `app` plugins
@@ -49,16 +49,16 @@ seed controller data, wait on postgres, register OAuth), set:
 }
 ```
 
-`flynn-host plugin install` runs `hooks.install` on a cluster node with
+`flynn-host plugin:install` runs `hooks.install` on a cluster node with
 cluster-admin credentials (`CONTROLLER_KEY`, `CLUSTER_DOMAIN`,
 `FLYNN_PLUGIN_NAME`, `FLYNN_PLUGIN_KIND`, `FLYNN_PLUGIN_ROOT`). Working
 directory is the plugin checkout. A non-zero exit aborts install.
 
 Hooks are optional. Redis does not need one; a dashboard often does. Scripts
-must be idempotent: `plugin update` runs `hooks.upgrade` if set, otherwise
+must be idempotent: `plugin:update` runs `hooks.upgrade` if set, otherwise
 `hooks.install` again.
 
-`flynn-host plugin uninstall` runs `hooks.uninstall` (if set) before deleting
+`flynn-host plugin:uninstall` runs `hooks.uninstall` (if set) before deleting
 the plugin app. A non-zero exit aborts uninstall. Resource-provider plugins
 with leftover provisioned resources refuse unless `--force`.
 
@@ -134,7 +134,7 @@ Unit tests write HTML coverage under `coverage/` (gitignored): open `coverage/in
   layers, then creates the GitHub Release with `image.json`, `<manifest-id>.json`,
   hook scripts, and the plugin **delta** squashfs (not Flynn ubuntu-noble).
 
-`flynn-host plugin install` pulls `artifacts.image` from the release (stable
+`flynn-host plugin:install` pulls `artifacts.image` from the release (stable
 name `image.json`). Production plugins publish those layers.
 
 ## flynn-plugin.json
@@ -153,8 +153,15 @@ Common fields:
   from the cluster (`command`, `usage`, `doc`, `actions`). The CLI does not
   compile plugin handlers; runnable plugins set `doc` (docopt) and `actions`
   (cluster jobs using the plugin/resource image). See Flynn `docs/content/plugins.md`.
-- `hooks.install` — optional script run against the cluster before deploy
-- `hooks.uninstall` — optional script run against the cluster before app delete
+  This template declares `cli.subcommands: ["ping"]` as a placeholder: there is
+  no `doc`/`actions` spec, so `flynn example` does not appear on `flynn help`
+  until you add those fields (or omit `cli` entirely for an HTTP system app).
+- `setup` — optional TTY prompts (`env`, `prompt`, `secret`, `optional`, `generate`)
+- `resources` — existing providers to attach on first install (for example `postgres`)
+- `routes` — HTTP/TCP routes (`${CLUSTER_DOMAIN}` expanded; `auto_tls` for ACME)
+- `webhooks` — `flynn-host` webhooks (`url`, `secret_env`) registered on install
+- `wait` — URL the installer polls before `hooks.ready`
+- `hooks.install` / `hooks.upgrade` / `hooks.uninstall` / `hooks.ready` — optional scripts
 - `build.entrypoint` — Flynn ImageManifest args
 - `build.base` — Flynn GitHub repo/tag/`images.json` key for ubuntu-noble (`version: latest` or a pin like `v20260911.0`)
 - `build.packages` — chroot apt overlay on that base
@@ -167,10 +174,11 @@ Builds use `-mod=mod` (no `vendor/` directory). Do not pin a sibling `../flynn` 
 ## Install
 
 ```text
-flynn-host plugin install example
-flynn-host plugin install /path/to/this-repo
-flynn-host plugin install https://github.com/OWNER/flynn-plugin-example.git --ref v20260914.0
-flynn-host plugin uninstall example
+sudo flynn-host plugin:install example
+sudo flynn-host plugin:install /path/to/this-repo
+sudo flynn-host plugin:install https://github.com/OWNER/flynn-plugin-example.git --ref v20260914.0
+sudo flynn-host plugin:update example --ref v20260914.0
+sudo flynn-host plugin:uninstall example
 ```
 
 The user `flynn` CLI never installs plugins. After install it shows commands
