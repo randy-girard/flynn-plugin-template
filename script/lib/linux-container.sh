@@ -105,6 +105,7 @@ plugin_run_in_linux() {
     -e FLYNN_PLUGIN_IN_CONTAINER=1
     -e CGO_ENABLED=0
     -e "GOFLAGS=-mod=mod -buildvcs=false"
+    -e GOPRIVATE=github.com/randy-girard/*
     -e PLUGIN_VERSION
     -e VERSION
     -e GITHUB_REPOSITORY

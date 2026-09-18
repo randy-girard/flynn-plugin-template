@@ -349,3 +349,93 @@ func TestRepoFlynnPluginManifestUninstallHook(t *testing.T) {
 		t.Fatalf("asset name=%q", hookAssetName(m.Hooks.Uninstall))
 	}
 }
+
+func TestFlynnGoModUsesRandyGirardRepo(t *testing.T) {
+	root, err := filepath.Abs("../..")
+	if err != nil {
+		t.Fatal(err)
+	}
+	mod, err := os.ReadFile(filepath.Join(root, "go.mod"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := string(mod)
+
+	pluginName := filepath.Base(root)
+	wantMod := "module github.com/randy-girard/" + pluginName
+	if !strings.Contains(body, wantMod+"\n") && !strings.HasPrefix(strings.TrimSpace(body), wantMod) {
+		t.Fatalf("go.mod must declare %q", wantMod)
+	}
+	manifest, err := os.ReadFile(filepath.Join(root, "flynn-plugin.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var pluginJSON struct {
+		Build struct {
+			Go map[string]string `json:"go"`
+		} `json:"build"`
+	}
+	if err := json.Unmarshal(manifest, &pluginJSON); err != nil {
+		t.Fatal(err)
+	}
+	if len(pluginJSON.Build.Go) == 0 {
+		t.Fatal("flynn-plugin.json build.go must list plugin packages as ./cmd/...")
+	}
+	for pkg := range pluginJSON.Build.Go {
+		if !strings.HasPrefix(pkg, "./") {
+			t.Fatalf("build.go package %q must be a repo-relative ./cmd/... path", pkg)
+		}
+	}
+	if !strings.Contains(body, "github.com/randy-girard/flynn ") {
+		t.Fatal("go.mod must require github.com/randy-girard/flynn (the Flynn git repo)")
+	}
+	if strings.Contains(body, "github.com/flynn/flynn") {
+		t.Fatal("go.mod must not require github.com/flynn/flynn")
+	}
+	if strings.Contains(body, "replace github.com/randy-girard/flynn => ../flynn") {
+		t.Fatal("go.mod must not replace Flynn with a sibling checkout")
+	}
+	if _, err := os.Stat(filepath.Join(root, "vendor")); err == nil {
+		t.Fatal("plugins must not vendor Flynn; the repo is declared in go.mod")
+	}
+	linux, err := os.ReadFile(filepath.Join(root, "script", "lib", "linux-container.sh"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	script := string(linux)
+	if strings.Contains(script, "plugin_flynn_root") || strings.Contains(script, ":/flynn") {
+		t.Fatal("linux-container.sh must not require a sibling Flynn checkout")
+	}
+	if !strings.Contains(script, "-mod=mod") {
+		t.Fatal("linux-container.sh must use -mod=mod")
+	}
+	if !strings.Contains(script, "GOPRIVATE") {
+		t.Fatal("linux-container.sh must set GOPRIVATE for github.com/randy-girard")
+	}
+	gobuild, err := os.ReadFile(filepath.Join(root, "cmd", "plugin-build", "gobuild.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(gobuild), `GOFLAGS=-mod=mod -buildvcs=false`) {
+		t.Fatal("plugin-build must compile plugin binaries with -mod=mod")
+	}
+	for _, rel := range []string{
+		filepath.Join(".github", "workflows", "ci.yml"),
+		filepath.Join(".github", "workflows", "release.yml"),
+	} {
+		raw, err := os.ReadFile(filepath.Join(root, rel))
+		if err != nil {
+			t.Fatal(err)
+		}
+		text := string(raw)
+		if strings.Contains(text, "Checkout Flynn sibling") {
+			t.Fatalf("%s must not clone a Flynn sibling", rel)
+		}
+		if strings.Contains(text, "-mod=vendor") {
+			t.Fatalf("%s must not use -mod=vendor", rel)
+		}
+		if !strings.Contains(text, "GOPRIVATE") || !strings.Contains(text, "github.com/randy-girard") {
+			t.Fatalf("%s must set GOPRIVATE=github.com/randy-girard/*", rel)
+		}
+	}
+}
