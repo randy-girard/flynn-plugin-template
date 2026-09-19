@@ -23,9 +23,11 @@ Use [Conventional Commits](https://www.conventionalcommits.org/):
 
 Types: `feat`, `fix`, `docs`, `test`, `refactor`, `perf`, `ci`, `build`, `chore`.
 
-- One concern per commit. Do not mix a feature and an unrelated cleanup.
+- **Always commit logically**: one concern per commit. Do not dump an entire session or mixed features into one catch-all commit.
+- Do not mix a feature with an unrelated cleanup, rename, or formatting pass.
 - Subject is why it matters, not a file list. No trailing period required; keep it to one line.
 - Put tests in the same commit as the behavior they cover (`feat`/`fix` with tests), not a later `test:` dump unless the commit is tests-only.
+- Stage whole files by path. Do not use `git add -p` or `git add -i`. If one file mixes concerns, still commit the other files separately.
 - Do not commit `dist/`, `.plugin-build-cache/`, or `script/docker/dev/.image-built`.
 
 Examples:

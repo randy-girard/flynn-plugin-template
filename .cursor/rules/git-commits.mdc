@@ -1,0 +1,19 @@
+---
+description: Always use Conventional Commits and split work into logical commits
+alwaysApply: true
+---
+
+# Semantic, logical git commits
+
+Follow [AGENTS.md](../../AGENTS.md). **Always** use Conventional Commits. Never write unstructured subjects.
+
+Format: `<type>(optional-scope): <imperative summary>`
+
+When committing, **always split work into logical commits** (one concern each):
+
+- Do not dump an entire session or mixed features into one catch-all commit
+- Keep tests and docs that belong to that concern in the same commit
+- Do not mix a feature with an unrelated cleanup, rename, or formatting pass
+- Stage whole files by path (`git add path`). Do not use `git add -p` or `git add -i`
+- If one file mixes concerns, still commit the other files separately
+- Do not commit `dist/`, `.plugin-build-cache/`, or `script/docker/dev/.image-built`
