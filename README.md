@@ -128,7 +128,7 @@ Unit tests write HTML coverage under `coverage/` (gitignored): open `coverage/in
 
 - **CI** (`ci.yml`): `gofmt`, release-note checks, and `go test` on push/PR (same split as Flynn unit tests).
 - **Build and Release** (`release.yml`): **manual only** (`workflow_dispatch`). Enter a version
-  like `v20260914.0`. Default is a published GitHub Release (not draft, not
+  like `v20260914.0.0` (`vYYYYMMDD.N.P`). Leave empty to pick the next tag; plugin-only rebuilds increment the last number while Flynn stays `vYYYYMMDD.N`. Default is a published GitHub Release (not draft, not
   prerelease). Notes group conventional commits the same way Flynn does, with a
   Full Changelog compare link and install commands. The workflow builds squashfs
   layers, then creates the GitHub Release with `image.json`, `<manifest-id>.json`,
@@ -176,8 +176,8 @@ Builds use `-mod=mod` (no `vendor/` directory). Do not pin a sibling `../flynn` 
 ```text
 sudo flynn-host plugin:install example
 sudo flynn-host plugin:install /path/to/this-repo
-sudo flynn-host plugin:install https://github.com/OWNER/flynn-plugin-example.git --ref v20260914.0
-sudo flynn-host plugin:update example --ref v20260914.0
+sudo flynn-host plugin:install https://github.com/OWNER/flynn-plugin-example.git --ref v20260914.0.0
+sudo flynn-host plugin:update example --ref v20260914.0.0
 sudo flynn-host plugin:uninstall example
 ```
 

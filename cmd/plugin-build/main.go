@@ -77,7 +77,7 @@ func run() error {
 	var (
 		dir          = flag.String("dir", root, "plugin repository root")
 		out          = flag.String("out", "dist", "output directory (relative to -dir unless absolute)")
-		version      = flag.String("version", envOr("PLUGIN_VERSION", envOr("VERSION", "dev")), "plugin version / git tag (e.g. v20260914.0)")
+		version      = flag.String("version", envOr("PLUGIN_VERSION", envOr("VERSION", "dev")), "plugin version / git tag (e.g. v20260914.0.0)")
 		githubRepo   = flag.String("github-repo", envOr("GITHUB_REPOSITORY", ""), "GitHub owner/repo for this plugin's release download URLs")
 		flynnRepo    = flag.String("flynn-repo", envOr("FLYNN_GITHUB_REPO", ""), "Flynn GitHub repo that publishes ubuntu-noble")
 		flynnVersion = flag.String("flynn-version", envOr("FLYNN_VERSION", envOr("PLUGIN_FLYNN_VERSION", "")), "Flynn release tag, or latest")

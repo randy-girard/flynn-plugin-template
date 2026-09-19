@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Version tag (e.g. v20260917.0). Leave empty to use today UTC and the next .N"
+        description: "Version tag (e.g. v20260917.2.0). Leave empty for the next vYYYYMMDD.N.P. Plugin-only rebuilds increment the last number."
         required: false
         type: string
         default: ""
@@ -58,8 +58,11 @@ jobs:
             source ./script/lib/calver.sh
             VERSION="$(next_release_version_from_tags)"
             echo "Using next version ${VERSION}"
-          elif [[ ! "${VERSION}" =~ ^v[0-9]{8}\.[0-9]+$ ]]; then
-            echo "ERROR: version must look like vYYYYMMDD.N (got '${VERSION}')" >&2
+          elif [[ "${VERSION}" =~ ^v[0-9]{8}\.[0-9]+$ ]]; then
+            VERSION="${VERSION}.0"
+            echo "Normalized Flynn-style tag to plugin version ${VERSION}"
+          elif [[ ! "${VERSION}" =~ ^v[0-9]{8}\.[0-9]+\.[0-9]+$ ]]; then
+            echo "ERROR: version must look like vYYYYMMDD.N.P (got '${VERSION}')" >&2
             exit 1
           fi
           if git rev-parse "${VERSION}" >/dev/null 2>&1; then
