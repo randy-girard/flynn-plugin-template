@@ -19,6 +19,7 @@ do not.
 |--------|---------|------------|
 | `app` | Dashboard, UI, other first-party cluster software | Deploy the system app. No `add-provider`. |
 | `resource-provider` | Redis, MariaDB, and other datastores | Deploy the system app and register `provider`. |
+| `scheduler` | Cron/interval job runner (`flynn-plugin-scheduler`) | Deploy the system app; its `cli` is published on the user `flynn` CLI like a resource provider. |
 
 This template is an `app` (a small HTTP service). Database plugins add
 `provider`, set `flynn-datastore` on the app, and usually omit install hooks.
@@ -146,7 +147,7 @@ See the example in this repo (`kind: app`). Resource-provider plugins also set:
 
 Common fields:
 
-- `kind` — `app` or `resource-provider`
+- `kind` — `app`, `resource-provider`, or `scheduler`
 - `app` — system app spec (`flynn-system-app`, `flynn-plugin` meta)
 - `inject_env` — cluster secrets the installer copies in (`CONTROLLER_KEY`, …)
 - `cli` — optional user `flynn` command. After install the laptop fetches this
@@ -156,10 +157,11 @@ Common fields:
   This template declares `cli.subcommands: ["ping"]` as a placeholder: there is
   no `doc`/`actions` spec, so `flynn example` does not appear on `flynn help`
   until you add those fields (or omit `cli` entirely for an HTTP system app).
-- `setup` — optional TTY prompts (`env`, `prompt`, `secret`, `optional`, `generate`)
+- `setup` — optional TTY prompts (`env`, `prompt`, `default`, `secret`, `optional`, `generate`, `choices`, `when`)
 - `resources` — existing providers to attach on first install (for example `postgres`)
 - `routes` — HTTP/TCP routes (`${CLUSTER_DOMAIN}` expanded; `auto_tls` for ACME)
-- `webhooks` — `flynn-host` webhooks (`url`, `secret_env`) registered on install
+- `webhooks` — `flynn-host` webhooks (`url`, `headers`, `secret_env`) registered on install
+- `aliases` / `github_repo` — extra install names and the `owner/repo` used for GitHub installs
 - `wait` — URL the installer polls before `hooks.ready`
 - `hooks.install` / `hooks.upgrade` / `hooks.uninstall` / `hooks.ready` — optional scripts
 - `build.entrypoint` — Flynn ImageManifest args

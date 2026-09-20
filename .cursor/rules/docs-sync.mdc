@@ -1,0 +1,17 @@
+---
+description: Keep documentation in sync with code changes
+alwaysApply: true
+---
+
+# Docs stay current
+
+Follow [AGENTS.md](../../AGENTS.md).
+
+Do not ship behavior without updating the docs in the **same change**. When the plugin's behavior, `flynn-plugin.json` (kind, provider, `cli` actions, `setup` prompts, `env` / `inject_env` / `generate_env`, `routes`, `hooks`, `webhooks`, `wait`, ports, TLS), injected connection env vars, install/update/uninstall flow, or release flow changes:
+
+- Update `README.md` (install, usage, commands table, env vars, ports, layout, release steps) and `AGENTS.md` when the change is agent-facing (tests, contract, layout).
+- Write `flynn` / `flynn-host` commands in the canonical `noun:verb` form (`flynn-host plugin:install`, `flynn redis:cli`, `flynn kafka:topics:create`); mention the space form only as an alias.
+- The Flynn repo documents this plugin too: `docs/content/plugins.md` and, for resource providers, `docs/content/databases/<engine>.md` in `randy-girard/flynn` may need a matching change. Make it when a sibling `../flynn` checkout exists; otherwise note it in the commit body or PR.
+- Use GitHub-relative markdown links. Do not leave docs describing removed or replaced behavior (old versions, plaintext defaults, `develop`, DCO sign-off).
+
+Skip docs only when the change has no user- or operator-visible effect; say so in the commit body.
