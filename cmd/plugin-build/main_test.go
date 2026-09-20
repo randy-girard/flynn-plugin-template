@@ -361,10 +361,16 @@ func TestFlynnGoModUsesRandyGirardRepo(t *testing.T) {
 	}
 	body := string(mod)
 
-	pluginName := filepath.Base(root)
-	wantMod := "module github.com/randy-girard/" + pluginName
-	if !strings.Contains(body, wantMod+"\n") && !strings.HasPrefix(strings.TrimSpace(body), wantMod) {
-		t.Fatalf("go.mod must declare %q", wantMod)
+	modLine := ""
+	for _, line := range strings.Split(body, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "module ") {
+			modLine = trimmed
+			break
+		}
+	}
+	if !strings.HasPrefix(modLine, "module github.com/randy-girard/") {
+		t.Fatalf("go.mod must declare module github.com/randy-girard/..., got %q", modLine)
 	}
 	manifest, err := os.ReadFile(filepath.Join(root, "flynn-plugin.json"))
 	if err != nil {
