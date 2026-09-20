@@ -59,8 +59,10 @@ source "${notes_lib}"
 sample="$(mktemp)"
 trap 'rm -f "${sample}"' EXIT
 plugin_github_release_notes "v20990101.0" "example/flynn-plugin" > "${sample}"
-if ! grep -qE '### ✨ Features|### 🐛 Bug Fixes|### 🧪 Tests|### 👷 CI|### 📦 Other Changes|No changes recorded' "${sample}"; then
-  echo "generated notes must include grouped changes or an empty-range fallback" >&2
+# Any conventional-commit group counts (docs-only or chore-only ranges emit
+# only their own heading), or the empty-range fallback.
+if ! grep -qE '^### |No changes recorded' "${sample}"; then
+  echo "generated notes must include a grouped section or an empty-range fallback" >&2
   head -n 40 "${sample}" >&2
   exit 1
 fi
