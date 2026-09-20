@@ -27,15 +27,50 @@ This template is an `app` (a small HTTP service). Database plugins add
 ## Layout
 
 ```text
-flynn-plugin.json     Install contract (name, kind, app spec, optional provider/cli/hooks)
+flynn-plugin.json     Install contract (name, kind, app spec, optional provider/cli/hooks/dashboard)
 img/packages.sh       apt packages over Flynn's ubuntu-noble layer
 cmd/<name>/           Plugin process
+internal/dashui/      Copy-paste kit: SSO, HTML chrome, card JSON, metric events
 cmd/plugin-build/     Writes dist/image.json + squashfs layers Flynn pulls
 script/plugin-build   Wrapper: CGO_ENABLED=0 go run ./cmd/plugin-build
 script/install.sh     Optional hook: cluster setup before the app is deployed
 script/uninstall.sh   Optional hook: cluster cleanup before the app is deleted
 .github/workflows/    CI (unit tests) and manual Build and Release
 ```
+
+## Dashboard addon pages
+
+The cluster dashboard hosts plugin UIs (Heroku add-on style). Declare a
+`dashboard` block in `flynn-plugin.json`. Install stamps it on the plugin app;
+the dashboard discovers pages from that meta, not a compiled-in list.
+
+```json
+"dashboard": {
+  "base_url": "http://example.discoverd/dashboard",
+  "surfaces": ["app.resources"],
+  "card": {"title": "Example", "description": "Template plugin UI"},
+  "routes": [
+    {"path": "/", "title": "Overview"},
+    {"path": "/metrics", "title": "Metrics"}
+  ]
+}
+```
+
+Copy `internal/dashui` into the new plugin. Serve HTML under `base_url`. The
+dashboard reverse-proxies those pages at `/apps/:id/resources/<plugin>/…` and
+sends a short-lived SSO JWT (JWKS at `http://dashboard.discoverd/.well-known/jwks.json`).
+Never send `CONTROLLER_KEY` to the browser.
+
+`GET /card` returns `{status, attached, summary, env_count, details}` for the
+Resources tile. Datastore plugins POST per-app samples to
+`http://dashboard.discoverd/webhooks/plugin-metrics`:
+
+```json
+{"app_id":"demo","resource_id":"res-1","plugin":"example","timestamp":"2026-09-20T21:00:00Z","series":{"connections":1}}
+```
+
+Document series names here so alerts can hook them. `DASHBOARD_SSO_OPTIONAL=1`
+accepts `X-Flynn-Dashboard-App` for local tests.
 
 ## Install hooks
 
