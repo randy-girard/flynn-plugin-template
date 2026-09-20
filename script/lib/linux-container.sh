@@ -7,7 +7,7 @@
 # Environment:
 #   PLUGIN_BUILD_DOCKER=1   Force Docker even on Linux
 #   PLUGIN_BUILD_DOCKER=0   Force native (fails on macOS without Linux deps)
-#   PLUGIN_LINUX_IMAGE      Image tag [default: flynn-plugin-dev:24.04-<arch>]
+#   PLUGIN_LINUX_IMAGE      Image tag [default: <repo>-dev:24.04-<arch>]
 #   PLUGIN_LINUX_PLATFORM   Docker platform [default: linux/<host arch>]
 #   PLUGIN_GOARCH           Override Go/OS-layer arch (amd64 or arm64)
 #
@@ -29,7 +29,7 @@ plugin_platform_arch() {
   esac
 }
 
-PLUGIN_LINUX_IMAGE="${PLUGIN_LINUX_IMAGE:-flynn-plugin-dev:24.04}"
+PLUGIN_LINUX_IMAGE="${PLUGIN_LINUX_IMAGE:-$(basename "${ROOT:-flynn-plugin-template}")-dev:24.04}"
 case "${PLUGIN_LINUX_IMAGE}" in
   *-amd64|*-arm64) ;;
   *) PLUGIN_LINUX_IMAGE="${PLUGIN_LINUX_IMAGE}-$(plugin_platform_arch)" ;;
