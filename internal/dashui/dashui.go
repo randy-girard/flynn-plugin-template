@@ -239,6 +239,59 @@ func hostedInDashboard(sess *Session) bool {
 	return sess != nil && strings.Contains(sess.Base, "/api/plugin-ui/")
 }
 
+// Hosted is true when the Flynn dashboard SPA embeds this page in an iframe.
+func Hosted(sess *Session) bool {
+	return hostedInDashboard(sess)
+}
+
+// Nav is section links for standalone / docker-compose viewing. The dashboard
+// SPA already owns tabs, so this is empty when Hosted.
+func Nav(sess *Session, items ...[2]string) string {
+	if Hosted(sess) || len(items) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString(`<nav class="row muted" aria-label="Add-on sections">`)
+	for i, it := range items {
+		if i > 0 {
+			b.WriteByte(' ')
+		}
+		fmt.Fprintf(&b, `<a href="%s">%s</a>`, html.EscapeString(it[0]), html.EscapeString(it[1]))
+	}
+	b.WriteString(`</nav>`)
+	return b.String()
+}
+
+// DevEnabled is set by local docker compose (never by flynn-plugin.json).
+func DevEnabled() bool {
+	v := strings.TrimSpace(os.Getenv("DASHBOARD_DEV"))
+	return v == "1" || strings.EqualFold(v, "true")
+}
+
+// DevAddr is the HTTP listen address for docker-compose dashboard-dev.
+func DevAddr() string {
+	p := strings.TrimSpace(os.Getenv("PORT"))
+	if p == "" {
+		return ":8090"
+	}
+	if strings.HasPrefix(p, ":") {
+		return p
+	}
+	return ":" + p
+}
+
+// DevHandler redirects `/` to the overview with a demo app_id so a browser can
+// open the UI without SSO headers. Production plugin binaries ignore this.
+func DevHandler(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/" {
+			http.Redirect(w, r, "/dashboard/?app_id=demo", http.StatusFound)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 // WriteHTML writes a page that matches Flynn dashboard chrome.
 // When the dashboard hosts this UI in an iframe it omits the extra heading so
 // the SPA can own the page title and back-link.
@@ -331,6 +384,7 @@ body.plugin-ui { padding: 0 0 1.5rem; }
 .card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius); padding: 1.05rem 1.15rem; margin: 0 0 1rem; box-shadow: var(--shadow-sm); }
 .card h2 { font-size: .92rem; font-weight: 650; margin: 0 0 .65rem; }
 .row { display: flex; gap: .6rem; flex-wrap: wrap; align-items: center; }
+nav.row { margin: 0 0 1rem; }
 label { display: block; font-size: .8rem; font-weight: 600; margin: .45rem 0 .2rem; }
 input, textarea, select {
   width: 100%%; max-width: 40rem; font: inherit; color: var(--color-text);

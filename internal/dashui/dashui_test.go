@@ -77,6 +77,50 @@ func TestWriteJSONAndHTML(t *testing.T) {
 	}
 }
 
+func TestNavStandaloneVsHosted(t *testing.T) {
+	links := [][2]string{{"./", "Overview"}, {"metrics", "Metrics"}}
+	got := Nav(&Session{Base: "/dashboard/"}, links...)
+	if !strings.Contains(got, "href=\"./\"") || !strings.Contains(got, "metrics") {
+		t.Fatalf("standalone nav: %s", got)
+	}
+	if Nav(&Session{Base: "/api/plugin-ui/example/"}, links...) != "" {
+		t.Fatal("hosted pages must not duplicate SPA tabs")
+	}
+}
+
+func TestDevHandlerRedirectsRoot(t *testing.T) {
+	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ok"))
+	})
+	h := DevHandler(inner)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
+	if rec.Code != http.StatusFound || rec.Header().Get("Location") != "/dashboard/?app_id=demo" {
+		t.Fatalf("redirect %d %s", rec.Code, rec.Header().Get("Location"))
+	}
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/dashboard/?app_id=demo", nil))
+	if rec.Code != 200 || rec.Body.String() != "ok" {
+		t.Fatalf("pass-through %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestDevEnabledAndAddr(t *testing.T) {
+	t.Setenv("DASHBOARD_DEV", "")
+	if DevEnabled() {
+		t.Fatal("empty must be off")
+	}
+	t.Setenv("DASHBOARD_DEV", "1")
+	if !DevEnabled() {
+		t.Fatal("1 must be on")
+	}
+	t.Setenv("PORT", "8091")
+	if DevAddr() != ":8091" {
+		t.Fatalf("addr %s", DevAddr())
+	}
+}
+
 func TestRequireUnauthorized(t *testing.T) {
 	t.Setenv("DASHBOARD_SSO_OPTIONAL", "")
 	h := Require(func(w http.ResponseWriter, r *http.Request, s *Session) {

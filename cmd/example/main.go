@@ -5,15 +5,21 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/randy-girard/flynn-plugin-template/internal/dashui"
 )
 
-func main() {
-	addr := os.Getenv("PORT")
-	if addr == "" {
-		addr = "80"
-	}
+var exampleDashNav = [][2]string{
+	{"./", "Overview"},
+	{"metrics", "Metrics"},
+}
+
+func writeDash(w http.ResponseWriter, sess *dashui.Session, title, body string) {
+	dashui.WriteHTML(w, sess, title, dashui.Nav(sess, exampleDashNav...)+body)
+}
+
+func exampleMux() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/" {
@@ -25,9 +31,11 @@ func main() {
 	mux.HandleFunc("GET /ping", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, "pong")
 	})
-	mux.HandleFunc("GET /dashboard", dashui.Require(func(w http.ResponseWriter, r *http.Request, sess *dashui.Session) {
-		dashui.WriteHTML(w, sess, "Example", `<div class="card"><p>Template plugin UI. Copy <code>internal/dashui</code> into a real plugin.</p></div>`)
-	}))
+	overview := dashui.Require(func(w http.ResponseWriter, r *http.Request, sess *dashui.Session) {
+		writeDash(w, sess, "Example", `<div class="card"><p>Template plugin UI. Copy <code>internal/dashui</code> into a real plugin.</p></div>`)
+	})
+	mux.HandleFunc("GET /dashboard", overview)
+	mux.HandleFunc("GET /dashboard/{$}", overview)
 	mux.HandleFunc("GET /dashboard/card", dashui.Require(func(w http.ResponseWriter, r *http.Request, sess *dashui.Session) {
 		dashui.WriteJSON(w, http.StatusOK, dashui.Card{
 			Status:   "ready",
@@ -38,8 +46,24 @@ func main() {
 		})
 	}))
 	mux.HandleFunc("GET /dashboard/metrics", dashui.Require(func(w http.ResponseWriter, r *http.Request, sess *dashui.Session) {
-		dashui.WriteHTML(w, sess, "Metrics", `<div class="card"><p class="muted">No samples yet. Plugins POST series to the dashboard plugin-metrics webhook.</p></div>`)
+		writeDash(w, sess, "Metrics", `<div class="card"><p class="muted">No samples yet. Plugins POST series to the dashboard plugin-metrics webhook.</p></div>`)
 	}))
-	log.Printf("example plugin listening on :%s", addr)
-	log.Fatal(http.ListenAndServe(":"+addr, mux))
+	return mux
+}
+
+func main() {
+	h := exampleMux()
+	listen := ":" + strings.TrimSpace(os.Getenv("PORT"))
+	if listen == ":" {
+		listen = ":80"
+	}
+	if dashui.DevEnabled() {
+		_ = os.Setenv("DASHBOARD_SSO_OPTIONAL", "1")
+		h = dashui.DevHandler(h)
+		listen = dashui.DevAddr()
+		log.Printf("example dashboard-dev listening on %s — open http://127.0.0.1%s/dashboard/?app_id=demo", listen, listen)
+	} else {
+		log.Printf("example plugin listening on %s", listen)
+	}
+	log.Fatal(http.ListenAndServe(listen, h))
 }

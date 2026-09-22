@@ -9,3 +9,5 @@ script/docker/dev/.image-built
 #   go work edit -replace github.com/randy-girard/flynn=../flynn
 go.work
 go.work.sum
+# Air / local compose build output
+tmp/

@@ -1,0 +1,28 @@
+# Local add-on UI with mock data. Not copied into the plugin image.
+name: flynn-template-dashboard-dev
+
+services:
+  dashboard:
+    build:
+      context: .
+      dockerfile: mock/Dockerfile
+    working_dir: /src
+    volumes:
+      - .:/src
+      - template-dash-gomod:/go/pkg/mod
+      - template-dash-gocache:/root/.cache/go-build
+    environment:
+      DASHBOARD_DEV: "1"
+      DASHBOARD_SSO_OPTIONAL: "1"
+      PORT: "8097"
+      GOPRIVATE: github.com/randy-girard/*
+      GOPROXY: direct
+      GOSUMDB: off
+      GOFLAGS: "-mod=mod -buildvcs=false"
+      CGO_ENABLED: "0"
+    ports:
+      - "8097:8097"
+
+volumes:
+  template-dash-gomod:
+  template-dash-gocache:

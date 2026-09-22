@@ -56,6 +56,9 @@ jobs:
       - name: Release notes
         run: ./script/test-release-notes.sh
 
+      - name: Local compose contract
+        run: ./script/test-local-compose.sh
+
       - name: go test
         env:
           CGO_ENABLED: "0"

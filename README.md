@@ -31,6 +31,8 @@ flynn-plugin.json     Install contract (name, kind, app spec, optional provider/
 img/packages.sh       apt packages over Flynn's ubuntu-noble layer
 cmd/<name>/           Plugin process
 internal/dashui/      Copy-paste kit: SSO, HTML chrome, card JSON, metric events
+compose.yaml          Local mock dashboard UI (`docker compose up`)
+mock/                 Air image for local dashboard-dev
 cmd/plugin-build/     Writes dist/image.json + squashfs layers Flynn pulls
 script/plugin-build   Wrapper: CGO_ENABLED=0 go run ./cmd/plugin-build
 script/install.sh     Optional hook: cluster setup before the app is deployed
@@ -71,6 +73,21 @@ Resources tile. Datastore plugins POST per-app samples to
 
 Document series names here so alerts can hook them. `DASHBOARD_SSO_OPTIONAL=1`
 accepts `X-Flynn-Dashboard-App` for local tests.
+
+## Local UI
+
+No Flynn cluster is required. Docker Compose serves the example plugin dashboard pages
+with in-memory mock data (Air rebuilds when you edit Go):
+
+```text
+docker compose up --build
+```
+
+Open http://localhost:8097/dashboard/?app_id=demo
+
+`compose.yaml` and `mock/` are development-only and are not copied into the
+plugin image. Do not set `DASHBOARD_DEV` on a real cluster.
+
 
 ## Install hooks
 
