@@ -14,6 +14,7 @@ import (
 	"io"
 	"math/big"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -29,6 +30,7 @@ type Session struct {
 	Permissions []string
 	ResourceID  string
 	Base        string
+	Theme       string
 }
 
 // Card is GET /card JSON for the Resources tab tile.
@@ -59,6 +61,7 @@ func FromRequest(r *http.Request) (*Session, error) {
 	if !strings.HasSuffix(base, "/") {
 		base += "/"
 	}
+	theme := requestTheme(r)
 	if optionalSSO() {
 		if app := strings.TrimSpace(r.Header.Get("X-Flynn-Dashboard-App")); app != "" {
 			return &Session{
@@ -67,10 +70,11 @@ func FromRequest(r *http.Request) (*Session, error) {
 				AppID:  app,
 				Plugin: strings.TrimSpace(r.Header.Get("X-Flynn-Dashboard-Plugin")),
 				Base:   base,
+				Theme:  theme,
 			}, nil
 		}
 		if app := strings.TrimSpace(r.URL.Query().Get("app_id")); app != "" {
-			return &Session{UserID: "dev", AppID: app, Base: base}, nil
+			return &Session{UserID: "dev", AppID: app, Base: base, Theme: theme}, nil
 		}
 	}
 	token := bearer(r.Header.Get("Authorization"))
@@ -82,6 +86,7 @@ func FromRequest(r *http.Request) (*Session, error) {
 		return nil, err
 	}
 	sess.Base = base
+	sess.Theme = theme
 	if sess.AppID == "" {
 		sess.AppID = strings.TrimSpace(r.URL.Query().Get("app_id"))
 	}
@@ -109,6 +114,14 @@ func first(vals ...string) string {
 		if strings.TrimSpace(v) != "" {
 			return v
 		}
+	}
+	return ""
+}
+
+func requestTheme(r *http.Request) string {
+	t := strings.ToLower(strings.TrimSpace(first(r.URL.Query().Get("theme"), r.Header.Get("X-Flynn-Dashboard-Theme"))))
+	if t == "light" || t == "dark" {
+		return t
 	}
 	return ""
 }
@@ -210,41 +223,142 @@ func WriteJSON(w http.ResponseWriter, status int, v any) {
 	_ = json.NewEncoder(w).Encode(v)
 }
 
-// WriteHTML writes a small page that matches dashboard chrome inside the iframe.
+// AppHref is the dashboard SPA URL for the session app (open with target=_parent).
+func AppHref(sess *Session) string {
+	if sess == nil {
+		return "/apps"
+	}
+	id := first(sess.AppName, sess.AppID)
+	if id == "" {
+		return "/apps"
+	}
+	return "/apps/" + url.PathEscape(id)
+}
+
+func hostedInDashboard(sess *Session) bool {
+	return sess != nil && strings.Contains(sess.Base, "/api/plugin-ui/")
+}
+
+// WriteHTML writes a page that matches Flynn dashboard chrome.
+// When the dashboard hosts this UI in an iframe it omits the extra heading so
+// the SPA can own the page title and back-link.
 func WriteHTML(w http.ResponseWriter, sess *Session, title, body string) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	base := "/"
-	nav := ""
+	theme := ""
+	kicker := ""
 	if sess != nil {
 		base = html.EscapeString(sess.Base)
-		nav = fmt.Sprintf(`<p class="muted">App <code>%s</code></p>`, html.EscapeString(first(sess.AppName, sess.AppID)))
+		theme = sess.Theme
+		if !hostedInDashboard(sess) {
+			app := html.EscapeString(first(sess.AppName, sess.AppID))
+			kicker = fmt.Sprintf(
+				`<header class="plugin-ui-head"><h1>%s</h1><p class="muted"><a href="%s" target="_parent">Back to app</a> · <code>%s</code></p></header>`,
+				html.EscapeString(title), html.EscapeString(AppHref(sess)), app,
+			)
+		}
+	}
+	attr := ""
+	if theme != "" {
+		attr = ` data-theme="` + html.EscapeString(theme) + `"`
 	}
 	_, _ = fmt.Fprintf(w, `<!doctype html>
-<html><head>
+<html%s>
+<head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <base href="%s">
 <title>%s</title>
 <style>
-:root { color-scheme: dark light; font-family: ui-sans-serif, system-ui, sans-serif; }
-body { margin: 0; padding: 1rem 1.15rem; background: transparent; color: inherit; }
-h1 { font-size: 1.05rem; margin: 0 0 .75rem; }
-.muted { color: #888; font-size: .85rem; }
-.card { border: 1px solid #3333; border-radius: 10px; padding: 1rem 1.1rem; margin: 0 0 1rem; }
+:root {
+  color-scheme: dark;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --radius: 6px;
+  --color-bg: #121018;
+  --color-surface: #1b1824;
+  --color-surface-hover: #242030;
+  --color-border: #2d2838;
+  --color-border-strong: #3d3750;
+  --color-text: #f4f2f8;
+  --color-text-muted: #a39bb3;
+  --color-primary: #b4a6ff;
+  --color-on-primary: #16131e;
+  --color-danger: #ff6b7a;
+  --color-danger-soft: rgba(255,107,122,.12);
+  --color-success: #3dd68c;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.28);
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    color-scheme: light;
+    --color-bg: #f4f6f9;
+    --color-surface: #ffffff;
+    --color-surface-hover: #eef1f6;
+    --color-border: #e4e0d9;
+    --color-border-strong: #d4cfc6;
+    --color-text: #1f1b2d;
+    --color-text-muted: #5f586c;
+    --color-primary: #5341d6;
+    --color-on-primary: #ffffff;
+    --color-danger: #c23b4e;
+    --color-danger-soft: rgba(194,59,78,.10);
+    --color-success: #1a8f5c;
+    --shadow-sm: 0 1px 2px rgba(31,27,45,.05);
+  }
+}
+html[data-theme="light"] {
+  color-scheme: light;
+  --color-bg: #f4f6f9;
+  --color-surface: #ffffff;
+  --color-surface-hover: #eef1f6;
+  --color-border: #e4e0d9;
+  --color-border-strong: #d4cfc6;
+  --color-text: #1f1b2d;
+  --color-text-muted: #5f586c;
+  --color-primary: #5341d6;
+  --color-on-primary: #ffffff;
+  --color-danger: #c23b4e;
+  --color-danger-soft: rgba(194,59,78,.10);
+  --color-success: #1a8f5c;
+  --shadow-sm: 0 1px 2px rgba(31,27,45,.05);
+}
+html, body { margin: 0; background: var(--color-bg); color: var(--color-text); font-family: var(--font-sans); line-height: 1.5; }
+body.plugin-ui { padding: 0 0 1.5rem; }
+.plugin-ui-head { margin: 0 0 1.15rem; }
+.plugin-ui-head h1 { font-size: 1.05rem; font-weight: 650; margin: 0 0 .35rem; letter-spacing: -0.01em; }
+.muted { color: var(--color-text-muted); font-size: .85rem; }
+.card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius); padding: 1.05rem 1.15rem; margin: 0 0 1rem; box-shadow: var(--shadow-sm); }
+.card h2 { font-size: .92rem; font-weight: 650; margin: 0 0 .65rem; }
 .row { display: flex; gap: .6rem; flex-wrap: wrap; align-items: center; }
-label { display: block; font-size: .8rem; margin: .4rem 0 .15rem; }
-input, textarea, select { width: 100%%; max-width: 40rem; }
-button, .btn { font: inherit; padding: .35rem .7rem; border-radius: 8px; cursor: pointer; }
+label { display: block; font-size: .8rem; font-weight: 600; margin: .45rem 0 .2rem; }
+input, textarea, select {
+  width: 100%%; max-width: 40rem; font: inherit; color: var(--color-text);
+  background: var(--color-bg); border: 1px solid var(--color-border); border-radius: 4px; padding: .45rem .6rem;
+}
+button, .btn {
+  font: inherit; font-weight: 600; font-size: .875rem; padding: .45rem .9rem; border-radius: 4px; cursor: pointer;
+  background: var(--color-surface); color: var(--color-text); border: 1px solid var(--color-border); box-shadow: var(--shadow-sm);
+}
+button:hover, .btn:hover { background: var(--color-surface-hover); border-color: var(--color-border-strong); }
+button.primary, .btn-primary { background: var(--color-primary); color: var(--color-on-primary); border-color: var(--color-primary); }
+button.danger, .btn-danger { color: var(--color-danger); border-color: var(--color-danger); background: var(--color-danger-soft); }
 table { width: 100%%; border-collapse: collapse; }
-th, td { text-align: left; padding: .35rem .4rem; border-bottom: 1px solid #3333; font-size: .9rem; }
-code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .85rem; }
-.banner { padding: .6rem .8rem; border-radius: 8px; background: #c00; color: #fff; margin-bottom: 1rem; }
-.ok { color: #2a7; }
+th, td { text-align: left; padding: .45rem .4rem; border-bottom: 1px solid var(--color-border); font-size: .9rem; vertical-align: top; }
+th { color: var(--color-text-muted); font-size: .75rem; font-weight: 650; text-transform: uppercase; letter-spacing: .04em; }
+code, pre { font-family: var(--font-mono); font-size: .85rem; }
+pre { white-space: pre-wrap; overflow: auto; }
+a { color: var(--color-primary); }
+.banner { padding: .65rem .8rem; border-radius: var(--radius); background: var(--color-danger-soft); color: var(--color-danger); border: 1px solid var(--color-danger); margin-bottom: 1rem; }
+.ok { color: var(--color-success); }
+.pill { display: inline-block; font-size: .72rem; font-weight: 650; letter-spacing: .03em; text-transform: uppercase; padding: .12rem .45rem; border-radius: 999px; border: 1px solid var(--color-border); color: var(--color-text-muted); }
+.mono { font-family: var(--font-mono); font-size: .85rem; }
 </style>
-</head><body>
-<h1>%s</h1>
+</head>
+<body class="plugin-ui">
 %s
 %s
-</body></html>`, base, html.EscapeString(title), html.EscapeString(title), nav, body)
+</body></html>`, attr, base, html.EscapeString(title), kicker, body)
 }
 
 // Require is middleware that attaches *Session or writes 401.

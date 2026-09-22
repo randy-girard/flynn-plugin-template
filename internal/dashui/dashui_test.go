@@ -63,9 +63,17 @@ func TestWriteJSONAndHTML(t *testing.T) {
 		t.Fatalf("%d %s", rec.Code, rec.Body.String())
 	}
 	rec = httptest.NewRecorder()
-	WriteHTML(rec, &Session{AppID: "demo", AppName: "demo", Base: "/dashboard/"}, "Overview", `<div class="card">hello</div>`)
+	WriteHTML(rec, &Session{AppID: "demo", AppName: "demo", Base: "/dashboard/", Theme: "dark"}, "Overview", `<div class="card">hello</div>`)
 	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "<base href=\"/dashboard/\">") || !strings.Contains(rec.Body.String(), "hello") {
 		t.Fatalf("%s", rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), `data-theme="dark"`) || !strings.Contains(rec.Body.String(), "Back to app") {
+		t.Fatalf("standalone chrome missing: %s", rec.Body.String())
+	}
+	rec = httptest.NewRecorder()
+	WriteHTML(rec, &Session{AppID: "demo", AppName: "demo", Base: "/api/plugin-ui/example/"}, "Overview", `<div class="card">hello</div>`)
+	if strings.Contains(rec.Body.String(), "Back to app") || strings.Contains(rec.Body.String(), "<h1>") {
+		t.Fatalf("dashboard iframe should not duplicate the SPA heading: %s", rec.Body.String())
 	}
 }
 
