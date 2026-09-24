@@ -14,6 +14,10 @@
 #
 # shellcheck shell=bash
 
+_discord_release_lib_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=script/lib/discord-release.sh
+source "${_discord_release_lib_dir}/discord-release.sh"
+
 GITHUB_RELEASE_ASSET_LIMIT=2147483648
 GITHUB_RELEASE_UPLOAD_ATTEMPTS="${GITHUB_RELEASE_UPLOAD_ATTEMPTS:-4}"
 GITHUB_RELEASE_RETRY_SLEEP="${GITHUB_RELEASE_RETRY_SLEEP:-5}"
@@ -252,4 +256,11 @@ github_release_publish() {
 
   echo "Created release ${version}"
   github_release_cmd release view "${version}" --repo "${repo}"
+  discord_notify_github_release \
+    --repo "${repo}" \
+    --version "${version}" \
+    --title "${title}" \
+    --notes-file "${notes}" \
+    --draft "${draft}" \
+    --prerelease "${prerelease}"
 }
