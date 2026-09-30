@@ -454,3 +454,49 @@ func TestFlynnGoModUsesRandyGirardRepo(t *testing.T) {
 		t.Fatal("plugins must not use go.work; each repo builds independently of Flynn and other plugins")
 	}
 }
+
+func TestRepoFlynnPluginControllerAppName(t *testing.T) {
+	root, err := filepath.Abs("../..")
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(filepath.Join(root, "flynn-plugin.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var m struct {
+		Name string `json:"name"`
+		App  struct {
+			Name      string `json:"name"`
+			Processes map[string]struct {
+				Ports []struct {
+					Service *struct {
+						Name  string `json:"name"`
+						Check *struct {
+							Path string `json:"path"`
+						} `json:"check"`
+					} `json:"service"`
+				} `json:"ports"`
+			} `json:"processes"`
+		} `json:"app"`
+		Dashboard struct {
+			BaseURL string `json:"base_url"`
+		} `json:"dashboard"`
+	}
+	if err := json.Unmarshal(raw, &m); err != nil {
+		t.Fatal(err)
+	}
+	if m.Name != "example" || m.App.Name != "example-plugin" {
+		t.Fatalf("name=%q app.name=%q", m.Name, m.App.Name)
+	}
+	if m.Dashboard.BaseURL != "http://example-plugin.discoverd/dashboard" {
+		t.Fatalf("base_url=%q", m.Dashboard.BaseURL)
+	}
+	web := m.App.Processes["web"]
+	if len(web.Ports) != 1 || web.Ports[0].Service == nil || web.Ports[0].Service.Name != "example-plugin" {
+		t.Fatalf("web service %+v", web.Ports)
+	}
+	if web.Ports[0].Service.Check == nil || web.Ports[0].Service.Check.Path != "/ping" {
+		t.Fatalf("web ping %+v", web.Ports[0].Service)
+	}
+}

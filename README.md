@@ -48,7 +48,7 @@ the dashboard discovers pages from that meta, not a compiled-in list.
 
 ```json
 "dashboard": {
-  "base_url": "http://example.discoverd/dashboard",
+  "base_url": "http://example-plugin.discoverd/dashboard",
   "surfaces": ["app.resources"],
   "card": {"title": "Example", "description": "Template plugin UI"},
   "routes": [
@@ -192,6 +192,13 @@ name `image.json`). Production plugins publish those layers.
 
 ## flynn-plugin.json
 
+`flynn-plugin.json` is the install contract. Controller apps use `app.name`
+`<plugin>-plugin` so `flynn-host ps` prints `example-plugin` (via
+`flynn-controller.app_name`), not `example`. The web process discoverd service
+matches that name (`example-plugin.discoverd`, HTTP `/ping`). Resource-provider
+plugins keep `provider.name` as the resource type (`mongodb`) so
+`flynn resource:add mongodb` still works.
+
 See the example in this repo (`kind: app`). Resource-provider plugins also set:
 
 - `provider.name` / `provider.url` — controller `add-provider` (discoverd URL)
@@ -200,7 +207,9 @@ See the example in this repo (`kind: app`). Resource-provider plugins also set:
 Common fields:
 
 - `kind` — `app`, `resource-provider`, or `scheduler`
-- `app` — system app spec (`flynn-system-app`, `flynn-plugin` meta)
+- `app` — system app spec. `app.name` is `<plugin>-plugin` (`example-plugin`) so
+  `flynn-host ps` shows the controller app with that suffix. The top-level
+  `name` stays the install alias (`example`).
 - `inject_env` — cluster secrets the installer copies in (`CONTROLLER_KEY`, …)
 - `cli` — optional user `flynn` command. After install the laptop fetches this
   from the cluster (`command`, `usage`, `doc`, `actions`). The CLI does not
