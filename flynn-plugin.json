@@ -2,7 +2,7 @@
   "name": "example",
   "kind": "app",
   "app": {
-    "name": "example",
+    "name": "example-plugin",
     "meta": {
       "flynn-system-app": "true",
       "flynn-plugin": "true"
@@ -10,13 +10,23 @@
     "processes": {
       "web": {
         "args": ["/bin/start-flynn-example"],
-        "ports": [{"port": 80, "proto": "tcp"}]
+        "ports": [
+          {
+            "port": 80,
+            "proto": "tcp",
+            "service": {
+              "name": "example-plugin",
+              "create": true,
+              "check": {"type": "http", "path": "/ping"}
+            }
+          }
+        ]
       }
     }
   },
   "inject_env": ["CONTROLLER_KEY", "SINGLETON"],
   "dashboard": {
-    "base_url": "http://example.discoverd/dashboard",
+    "base_url": "http://example-plugin.discoverd/dashboard",
     "surfaces": ["app.resources"],
     "card": {
       "title": "Example",
@@ -31,7 +41,8 @@
   "cli": {
     "command": "example",
     "usage": "example Flynn plugin (template)",
-    "subcommands": ["ping"]
+    "subcommands": ["list", "help", "ping"],
+    "doc": "usage: flynn example\n       flynn example:list\n       flynn example:help\n       flynn example ping\n\nexample:list is the same as flynn example. example:help is example --help.\n"
   },
   "hooks": {
     "install": "script/install.sh",
