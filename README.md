@@ -251,4 +251,8 @@ sudo flynn-host plugin:uninstall example
 
 The user `flynn` CLI never installs plugins. After install it shows commands
 listed in that cluster's CLI catalog when `cli.doc` and `cli.actions` are set
-(`cli` is optional; an `app` plugin may have none).
+(`cli` is optional; an `app` plugin may have none). Each action sets `scope`:
+`app` (honours global `-a` / `-r` / `-c`), `account` (on `flynn`, rejects `-a` /
+`-r`), or `cluster` (on `flynn-host` under the same command name). Global `-a` /
+`-r` / `-c` are consumed by flynn before the plugin command is parsed; do not
+put them in `cli.doc`.
