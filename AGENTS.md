@@ -1,6 +1,6 @@
 # Agent notes
 
-This is a Flynn **plugin** repo (`flynn-plugin.json`). Copy it for `kind: app` or `kind: resource-provider` plugins. Go 1.24, `GOFLAGS=-mod=mod`. Images are Linux/amd64 squashfs layered on Flynn’s published ubuntu-noble (GitHub `images.json.gz`).
+This is a Flynn **plugin** repo (`flynn-plugin.json`). Copy it for `kind: app` or `kind: resource-provider` plugins. Go 1.24, `GOFLAGS=-mod=mod`. Images are Linux/amd64 squashfs layered on Flynn’s published ubuntu-noble (GitHub `images.json.gz`). `plugin-build` caches the `img/packages.sh` layer and Go’s compile cache under `.plugin-build-cache/` so a Go-only rebuild does not reinstall apt packages. If you add `web/package.json`, `script/lib/embed-web.sh` skips npm when the UI sources are unchanged, and re-runs `npm ci --include=optional` when the OS/arch or rollup native binding does not match this machine.
 
 ## Tests are required
 
@@ -47,6 +47,7 @@ Examples:
 ```text
 feat: overlay plugin packages on Flynn ubuntu-noble
 fix: verify Flynn layers by sha512_256, not build-input id
+perf: reuse cached packages layer on Go-only plugin-build
 test: skip busybox blobstore when picking ubuntu-noble
 docs: document FLYNN_VERSION pinning for plugin-build
 ci: pass GITHUB_TOKEN when resolving the Flynn release

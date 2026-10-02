@@ -123,16 +123,16 @@ with leftover provisioned resources refuse unless `--force`.
 |------|------|
 | `dist/image.json` | Controller Artifact: `manifest`, `hashes` (`sha512_256`), `layer_url_template` |
 | `dist/<manifest-id>.json` | ImageManifest bytes that `artifact.uri` points at |
-| `dist/layers/<layer-id>.squashfs` | Flynn ubuntu-noble (local overlay only) plus the plugin delta |
+| `dist/layers/<layer-id>.squashfs` | Flynn ubuntu-noble (local overlay only) plus plugin packages and binaries |
 | `dist/flynn-plugin.json` | Manifest with `artifacts.image` set to the Artifact URL |
 
-The GitHub Release publishes the **plugin delta** squashfs next to `image.json`.
+The GitHub Release publishes the **plugin packages and binaries** squashfs files next to `image.json`.
 Flynn ubuntu-noble stays on the Flynn GitHub Release (same layer id); hosts
 fetch it from artifact meta `flynn.plugin.base`. Re-uploading that OS layer from
 every plugin (~200MiB × N jobs) 502s `uploads.github.com`.
 
 ```text
-https://github.com/<owner>/<plugin-repo>/releases/download/<tag>/{delta-id}.squashfs
+https://github.com/<owner>/<plugin-repo>/releases/download/<tag>/{layer-id}.squashfs
 https://github.com/<owner>/flynn/releases/download/<flynn-tag>/{ubuntu-noble-id}.squashfs
 ```
 
@@ -148,7 +148,12 @@ Image builds are Linux/amd64. `plugin-build` pulls Flynn's **ubuntu-noble** squa
 from a Flynn GitHub Release (`images.json.gz`). Named `ubuntu-noble` is often
 omitted from that file; plugin-build then takes layer 0 of `postgres` /
 `gitreceive` / similar (not `blobstore`, which is busybox after image-slim).
-It overlays `img/packages.sh` + gobuild and squashfs only the delta.
+It squashfs **two plugin layers**: `img/packages.sh` (cached under
+`.plugin-build-cache/` while those scripts and the Flynn OS layer stay the same)
+and gobuild/copy. A Go-only rebuild skips apt. Set
+`PLUGIN_BUILD_NO_PACKAGES_CACHE=1` to force a packages rebuild. `GOCACHE` is
+also kept in `.plugin-build-cache/go-build`. If you add a `web/` SPA, `script/lib/embed-web.sh`
+skips `npm ci` / `npm run build` when sources are unchanged, and re-runs `npm ci --include=optional` when the OS/arch or rollup native binding does not match this machine.
 
 Default Flynn source is `randy-girard/flynn` **latest published** tag. Pin a
 release for reproducible plugin images:
@@ -227,8 +232,8 @@ Common fields:
 - `hooks.install` / `hooks.upgrade` / `hooks.uninstall` / `hooks.ready` — optional scripts
 - `build.entrypoint` — Flynn ImageManifest args
 - `build.base` — Flynn GitHub repo/tag/`images.json` key for ubuntu-noble (`version: latest` or a pin like `v20260911.0`)
-- `build.packages` — chroot apt overlay on that base
-- `build.go` / `build.copy` — binaries and scripts installed into the delta layer
+- `build.packages` — chroot apt overlay on that base (own squashfs layer; reused when `img/` is unchanged)
+- `build.go` / `build.copy` — binaries and scripts in a second plugin layer
 - `artifacts.image` — filled by `plugin-build` / the release workflow
 
 Flynn APIs are declared in `go.mod` as `require github.com/randy-girard/flynn`.
