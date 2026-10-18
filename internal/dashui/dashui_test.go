@@ -145,3 +145,20 @@ func TestPostMetricsNoPanic(t *testing.T) {
 	t.Cleanup(func() { os.Unsetenv("DASHBOARD_METRICS_URL") })
 	PostMetrics(MetricEvent{AppID: "demo", Plugin: "example", Series: map[string]float64{"x": 1}})
 }
+
+func TestWriteHTMLLoadsLiveClient(t *testing.T) {
+	rec := httptest.NewRecorder()
+	WriteHTML(rec, &Session{AppID: "demo"}, "Overview", `<div class="card">hello</div>`)
+	page := rec.Body.String()
+	if !strings.Contains(page, "/api/live.js") || !strings.Contains(page, "FlynnLive.watch") {
+		t.Fatalf("live client missing")
+	}
+	if strings.Contains(page, "tenant:") {
+		t.Fatal("tenant in live boot")
+	}
+	rec = httptest.NewRecorder()
+	WriteHTML(rec, &Session{AppID: `abc");alert(1)`}, "Overview", `<div></div>`)
+	if strings.Contains(rec.Body.String(), "FlynnLive.watch") {
+		t.Fatal("rejected app id still subscribed")
+	}
+}

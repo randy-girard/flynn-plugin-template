@@ -16,6 +16,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -292,6 +293,65 @@ func DevHandler(next http.Handler) http.Handler {
 	})
 }
 
+// liveScopes are the dashboard topics this page follows.
+// An invalidation reloads the page. The interval stays 0 so a quiet page does not poll.
+var liveScopes = []string{"resources"}
+
+func liveAppID(id string) bool {
+	if id == "" || len(id) > 128 {
+		return false
+	}
+	for i, r := range id {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9':
+		case (r == '_' || r == '-' || r == '.') && i > 0:
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+func liveBoot(sess *Session) string {
+	if sess == nil || !liveAppID(strings.TrimSpace(sess.AppID)) {
+		return ""
+	}
+	app := strings.TrimSpace(sess.AppID)
+	var topics []string
+	for _, scope := range liveScopes {
+		topics = append(topics, strconv.Quote("app:"+app+"/"+scope))
+	}
+	if len(topics) == 0 {
+		return ""
+	}
+	return `<script>
+(function(){
+  var topics = [` + strings.Join(topics, ",") + `];
+  var dirty = false;
+  function typing(){
+    var el = document.activeElement;
+    return !!(el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT"));
+  }
+  function refresh(){
+    if (typing()) { dirty = true; return; }
+    dirty = false;
+    if (typeof window.flynnLiveRefresh === "function") { window.flynnLiveRefresh(); return; }
+    location.reload();
+  }
+  document.addEventListener("focusout", function(){
+    if (!dirty) return;
+    setTimeout(function(){ if (!typing()) refresh(); }, 0);
+  });
+  var s = document.createElement("script");
+  s.src = "/api/live.js";
+  s.onload = function(){
+    if (window.FlynnLive && window.FlynnLive.watch) window.FlynnLive.watch(topics, refresh, 0);
+  };
+  document.head.appendChild(s);
+})();
+</script>`
+}
+
 // WriteHTML writes a page that matches Flynn dashboard chrome.
 // When the dashboard hosts this UI in an iframe it omits the extra heading so
 // the SPA can own the page title and back-link.
@@ -472,7 +532,7 @@ a { color: var(--color-primary); }
   }
 })();
 </script>
-</body></html>`, attr, base, html.EscapeString(title), kicker, body)
+%s</body></html>`, attr, base, html.EscapeString(title), kicker, body, liveBoot(sess))
 }
 
 // Require is middleware that attaches *Session or writes 401.
