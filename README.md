@@ -202,7 +202,7 @@ name `image.json`). Production plugins publish those layers.
 `flynn-controller.app_name`), not `example`. The web process discoverd service
 matches that name (`example-plugin.discoverd`, HTTP `/ping`). Resource-provider
 plugins keep `provider.name` as the resource type (`mongodb`) so
-`flynn resource:add mongodb` still works.
+`flynn addons:create mongodb` still works.
 
 See the example in this repo (`kind: app`). Resource-provider plugins also set:
 
