@@ -60,8 +60,12 @@ the dashboard discovers pages from that meta, not a compiled-in list.
 
 Copy `internal/dashui` into the new plugin. Serve HTML under `base_url`. The
 dashboard reverse-proxies those pages at `/apps/:id/resources/<plugin>/…` and
-sends a short-lived SSO JWT (JWKS at `http://dashboard.discoverd/.well-known/jwks.json`).
-Never send `CONTROLLER_KEY` to the browser.
+sends a short-lived ES256 SSO JWT. List `DASHBOARD_SSO_JWKS_URL` in `inject_env`.
+Install copies `http://dashboard.discoverd/.well-known/jwks.json` from the
+dashboard app. Verification fails closed: a missing URL, a JWKS fetch error,
+or a bad signature rejects the request. Unsigned tokens are not accepted.
+`DASHBOARD_SSO_OPTIONAL=1` is only for local tests. Never send `CONTROLLER_KEY`
+to the browser.
 
 `GET /card` returns `{status, attached, summary, env_count, details}` for the
 Resources tile. Datastore plugins POST per-app samples to
@@ -72,7 +76,7 @@ Resources tile. Datastore plugins POST per-app samples to
 ```
 
 Document series names here so alerts can hook them. `DASHBOARD_SSO_OPTIONAL=1`
-accepts `X-Flynn-Dashboard-App` for local tests.
+accepts `X-Flynn-Dashboard-App` for local tests and must not be set on a cluster.
 
 ## Local UI
 
