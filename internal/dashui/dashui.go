@@ -549,6 +549,60 @@ func Require(next func(http.ResponseWriter, *http.Request, *Session)) http.Handl
 	}
 }
 
+func liveEndpoint() string {
+	raw := strings.TrimSpace(os.Getenv("DASHBOARD_METRICS_URL"))
+	endpoint := "http://dashboard.discoverd/webhooks/live"
+	if raw == "" {
+		return endpoint
+	}
+	if i := strings.Index(raw, "/webhooks/"); i >= 0 {
+		return raw[:i] + "/webhooks/live"
+	}
+	return strings.TrimRight(raw, "/") + "/webhooks/live"
+}
+
+func webhookSecret() string {
+	return strings.TrimSpace(os.Getenv("DASHBOARD_METRICS_SECRET"))
+}
+
+// NotifyLive tells the dashboard that an app topic changed. The dashboard
+// chooses the topic from plugin, app, and kind. An empty secret does nothing.
+func NotifyLive(plugin, appID, kind, id string) {
+	secret := webhookSecret()
+	plugin = strings.TrimSpace(plugin)
+	appID = strings.TrimSpace(appID)
+	kind = strings.TrimSpace(kind)
+	if strings.ContainsAny(appID, ":/") {
+		return
+	}
+	if secret == "" || plugin == "" || appID == "" || kind == "" {
+		return
+	}
+	body, err := json.Marshal(map[string]string{
+		"app_id": appID,
+		"plugin": plugin,
+		"kind":   kind,
+		"id":     strings.TrimSpace(id),
+	})
+	if err != nil {
+		return
+	}
+	req, err := http.NewRequest(http.MethodPost, liveEndpoint(), strings.NewReader(string(body)))
+	if err != nil {
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Flynn-Webhook-Secret", secret)
+	res, err := liveHTTPClient.Do(req)
+	if err != nil {
+		return
+	}
+	io.Copy(io.Discard, res.Body)
+	res.Body.Close()
+}
+
+var liveHTTPClient = &http.Client{Timeout: 8 * time.Second}
+
 // PostMetrics best-effort posts a sample to the dashboard plugin-metrics webhook.
 func PostMetrics(ev MetricEvent) {
 	url := strings.TrimSpace(os.Getenv("DASHBOARD_METRICS_URL"))
