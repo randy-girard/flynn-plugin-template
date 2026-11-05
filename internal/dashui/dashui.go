@@ -296,7 +296,7 @@ func DevHandler(next http.Handler) http.Handler {
 }
 
 // liveScopes are the dashboard topics this page follows.
-// An invalidation reloads the page. The interval stays 0 so a quiet page does not poll.
+// An invalidation reloads the page. The page does not poll.
 var liveScopes = []string{"resources"}
 
 func liveAppID(id string) bool {
@@ -347,7 +347,7 @@ func liveBoot(sess *Session) string {
   var s = document.createElement("script");
   s.src = "/api/live.js";
   s.onload = function(){
-    if (window.FlynnLive && window.FlynnLive.watch) window.FlynnLive.watch(topics, refresh, 0);
+    if (window.FlynnLive && window.FlynnLive.watch) window.FlynnLive.watch(topics, refresh);
   };
   document.head.appendChild(s);
 })();
