@@ -62,3 +62,7 @@ Commit when asked. Push only when asked.
 - Import Flynn APIs as `github.com/randy-girard/flynn/...`. `go.mod` must `require github.com/randy-girard/flynn`. Do not vendor Flynn and do not `replace` it with a sibling `../flynn`.
 - Do not put datastore packages in a shared Flynn base. This template’s image is the example app only.
 - `flynn-host plugin:install` is operator-only; the user `flynn` CLI does not install plugins.
+
+## Environment
+
+Cluster, test, and CI steps are the `flynn-environment` skill in the sibling Flynn checkout: `../flynn/.cursor/skills/flynn-environment/SKILL.md`. Read it before booting VMs, running e2e, or pushing. This file stays the repo-specific contract.
