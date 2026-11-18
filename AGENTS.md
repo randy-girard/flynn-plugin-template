@@ -20,7 +20,7 @@ Do not land behavior without docs in the **same change**.
 - `README.md`: install/update/uninstall commands, usage, the commands table, injected env vars, ports/TLS, layout, and the release flow must match `flynn-plugin.json` and the code. Commands use the canonical `noun:verb` form; the space form is only an alias.
 - `AGENTS.md`: update when the test layout, plugin contract, or agent-facing workflow changes.
 - `flynn-plugin.json` is documentation too: `cli.doc`, `cli.usage`, `setup` prompts, `dashboard` (addon UI contract), and `resource_missing` text are what users see. Keep them accurate and in `noun:verb` form.
-- `internal/dashui` is the copy-paste SSO/HTML/metrics kit. New plugins copy that directory; do not import this template module.
+- `internal/dashui` is the copy-paste SSO/HTML/metrics kit. New plugins copy that directory; do not import this template module. SSO verification and the write check live in `github.com/randy-girard/flynn/pkg/pluginui`; set `dashui.PluginName` to the manifest name.
 - The Flynn repo mirrors this plugin in `docs/content/plugins.md` (and `docs/content/databases/<engine>.md` for resource providers). When behavior visible to Flynn users changes, make the matching change in `randy-girard/flynn` (sibling `../flynn` checkout) or note it in the commit body / PR.
 
 Skip docs only when the change cannot be seen by a user or operator (internal refactor, test-only). Say so in the commit body. See `.cursor/rules/docs-sync.mdc`.

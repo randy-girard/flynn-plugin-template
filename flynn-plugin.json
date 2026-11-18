@@ -24,7 +24,7 @@
       }
     }
   },
-  "inject_env": ["CONTROLLER_KEY", "SINGLETON", "DASHBOARD_SSO_JWKS_URL"],
+  "inject_env": ["CONTROLLER_KEY", "SINGLETON", "DASHBOARD_SSO_JWKS_URL", "DASHBOARD_METRICS_URL", "DASHBOARD_METRICS_SECRET"],
   "dashboard": {
     "base_url": "http://example-plugin.discoverd/dashboard",
     "surfaces": ["app.resources"],

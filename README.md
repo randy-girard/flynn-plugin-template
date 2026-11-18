@@ -62,8 +62,12 @@ Copy `internal/dashui` into the new plugin. Serve HTML under `base_url`. The
 dashboard reverse-proxies those pages at `/apps/:id/resources/<plugin>/…` and
 sends a short-lived ES256 SSO JWT. List `DASHBOARD_SSO_JWKS_URL` in `inject_env`.
 Install copies `http://dashboard.discoverd/.well-known/jwks.json` from the
-dashboard app. Verification fails closed: a missing URL, a JWKS fetch error,
-or a bad signature rejects the request. Unsigned tokens are not accepted.
+dashboard app. Verification (`github.com/randy-girard/flynn/pkg/pluginui`)
+fails closed: a missing URL, a JWKS fetch error, a bad signature, a missing or
+wrong `kid`, `iss`, `aud` or `exp`, or a `plugin` claim other than this plugin
+rejects the request. Set `dashui.PluginName` to the manifest `name` (a test
+checks it). Write routes must check `pluginui.CanWrite(sess.Permissions)`,
+which denies a session with no permissions.
 `DASHBOARD_SSO_OPTIONAL=1` is only for local tests. Never send `CONTROLLER_KEY`
 to the browser.
 
