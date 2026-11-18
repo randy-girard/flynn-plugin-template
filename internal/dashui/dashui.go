@@ -64,16 +64,17 @@ func FromRequest(r *http.Request) (*Session, error) {
 	if optionalSSO() {
 		if app := strings.TrimSpace(r.Header.Get("X-Flynn-Dashboard-App")); app != "" {
 			return &Session{
-				UserID: strings.TrimSpace(first(r.Header.Get("X-Flynn-Dashboard-User"), "dev")),
-				Email:  strings.TrimSpace(r.Header.Get("X-Flynn-Dashboard-Email")),
-				AppID:  app,
-				Plugin: strings.TrimSpace(r.Header.Get("X-Flynn-Dashboard-Plugin")),
-				Base:   base,
-				Theme:  theme,
+				UserID:      strings.TrimSpace(first(r.Header.Get("X-Flynn-Dashboard-User"), "dev")),
+				Email:       strings.TrimSpace(r.Header.Get("X-Flynn-Dashboard-Email")),
+				AppID:       app,
+				Plugin:      strings.TrimSpace(r.Header.Get("X-Flynn-Dashboard-Plugin")),
+				Permissions: devPermissions(r),
+				Base:        base,
+				Theme:       theme,
 			}, nil
 		}
 		if app := strings.TrimSpace(r.URL.Query().Get("app_id")); app != "" {
-			return &Session{UserID: "dev", AppID: app, Base: base, Theme: theme}, nil
+			return &Session{UserID: "dev", AppID: app, Permissions: devPermissions(r), Base: base, Theme: theme}, nil
 		}
 	}
 	token := bearer(r.Header.Get("Authorization"))
@@ -90,6 +91,26 @@ func FromRequest(r *http.Request) (*Session, error) {
 		return nil, fmt.Errorf("SSO token missing app_id")
 	}
 	return sess, nil
+}
+
+// devPermissions are the permissions of a header-only (DASHBOARD_SSO_OPTIONAL)
+// session: the comma-separated X-Flynn-Dashboard-Permissions header, or full
+// access in the local docker-compose mode (DASHBOARD_DEV). Otherwise none, and
+// write routes refuse an empty permission set.
+func devPermissions(r *http.Request) []string {
+	if v := strings.TrimSpace(r.Header.Get("X-Flynn-Dashboard-Permissions")); v != "" {
+		var out []string
+		for _, p := range strings.Split(v, ",") {
+			if p = strings.TrimSpace(p); p != "" {
+				out = append(out, p)
+			}
+		}
+		return out
+	}
+	if DevEnabled() {
+		return []string{"*"}
+	}
+	return nil
 }
 
 func optionalSSO() bool {
