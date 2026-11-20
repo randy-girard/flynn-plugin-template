@@ -71,6 +71,15 @@ which denies a session with no permissions.
 `DASHBOARD_SSO_OPTIONAL=1` is only for local tests. Never send `CONTROLLER_KEY`
 to the browser.
 
+API calls the controller proxies to a plugin arrive with the controller key
+whoever the user is. Read the caller from the signed `X-Flynn-Caller` header
+with `plugincaller.FromRequest(r, controllerKey)`
+(`github.com/randy-girard/flynn/pkg/plugincaller`): it gives the admin flag,
+user id, personal account, and app grants (`Can`, `AppIDs`). Refuse a header
+that does not verify, and treat a non-admin call with no header as having no
+access to account-scoped data. See Flynn's
+[plugin docs](https://github.com/randy-girard/flynn/blob/main/docs/content/plugins.md#caller-identity-on-controller-proxied-calls).
+
 `GET /card` returns `{status, attached, summary, env_count, details}` for the
 Resources tile. Datastore plugins POST per-app samples to
 `http://dashboard.discoverd/webhooks/plugin-metrics`:
